@@ -31,12 +31,12 @@ import (
 type BPlusTree struct {
 	root   *node
 	degree int
+	access *bufio.ReadWriter
 	sync.RWMutex
 }
 
 type node struct {
 	keys     []int
-	_data    *bufio.ReadWriter
 	parent   *node
 	next     *node
 	children []*node
@@ -50,7 +50,7 @@ func NewBPlusTree(degree int) *BPlusTree {
 	}
 }
 
-func (t *BPlusTree) Insert(key int, value int) error {
+func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -62,38 +62,42 @@ func (t *BPlusTree) Insert(key int, value int) error {
 			next:     nil,
 		}
 	} else {
-		t.root.insert(t, key, t.degree)
+		t.root.insert(t, key, value, t.degree)
 	}
 
 	return nil
 }
 
-func (t *BPlusTree) Search(key int) (int, error) {
+func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
 	if t.root == nil {
-		return -1, errors.New("empty tree")
+		return []byte{}, errors.New("empty tree")
 	}
 	return t.root.search(key)
 }
 
 // insert inserts a key into the n.
-func (n *node) insert(t *BPlusTree, key int, degree int) {
+func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) {
 	if n.isLeaf {
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
+		// todo actually write and point to the offset as the leaf node
+		// _ := t.access.WriteByte(value)
+
 		n.keys = append(n.keys, 0)
 		copy(n.keys[i+1:], n.keys[i:])
 		n.keys[i] = key
+
 	} else {
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
-		n.children[i].insert(t, key, degree)
+		n.children[i].insert(t, key, value, degree)
 	}
 	if len(n.keys) > degree {
 		n.splitChild(t, len(n.keys)/2, t.degree)
@@ -101,7 +105,8 @@ func (n *node) insert(t *BPlusTree, key int, degree int) {
 }
 
 // binary search.
-func (node *node) search(key int) (int, error) {
+func (node *node) search(key int) ([]byte, error) {
+	// todo:
 	if node.isLeaf {
 		low, high := 0, len(node.keys)-1
 		for low <= high {
@@ -114,7 +119,7 @@ func (node *node) search(key int) (int, error) {
 				high = mid - 1
 			}
 		}
-		return -1, errors.New("key not found")
+		return []byte{}, errors.New("key not found")
 	}
 
 	// If the node is not a leaf node, recursively search in the appropriate child

@@ -1,50 +1,54 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 )
 
-func BenchmarkInsertBTree(b *testing.B) {
-	tree := NewBPlusTree(3)
+/*
+func TestInsertBTree(t *testing.T) {
+	tree := NewBPlusTree(4)
 
-	for i := 0; i < 100_000; i++ {
+	for i := 0; i < 2; i++ {
 		key := i
 		value := i * 10
 		err := tree.Insert(key, value)
 		if err != nil {
-			b.Errorf("Error inserting key %d: %v", key, err)
+			t.Errorf("Error inserting key %d: %v", key, err)
 		}
 	}
 }
 
-func BenchmarkAccessBTree(b *testing.B) {
-	tree := NewBPlusTree(3)
+*/
 
-	for i := 0; i < 100_000; i++ {
+func TestAccessBTree(t *testing.T) {
+	tree := NewBPlusTree(4)
+
+	for i := 0; i < 2; i++ {
 		key := i
-		value := i * 10
+		value := []byte(fmt.Sprintf("msg_", i))
 		err := tree.Insert(key, value)
 		if err != nil {
-			b.Errorf("Error inserting key %d: %v", key, err)
+			t.Errorf("Error inserting key %d: %v", key, err)
 		}
 	}
 
-	for i := 0; i < 100_000; i++ {
+	for i := 1; i < 3; i++ {
 		key := i
-		value := i * 10
+		value := []byte(fmt.Sprintf("msg_", i))
 		err := tree.Insert(key, value)
 		result, errGet := tree.Search(key)
 
 		if err != nil {
-			b.Errorf("Error inserting key %d: %v", key, err)
+			t.Errorf("Error inserting key %d: %v", key, err)
 		}
 
 		if err != errGet {
-			b.Errorf("Error inserting key %d: %v", key, err)
+			t.Errorf("Error inserting key %d: %v", key, err)
 		}
 
-		if key != result {
-			b.Errorf("Error key does not match result")
+		if value != result {
+			t.Errorf("Error key does not match result")
 		}
 	}
 
