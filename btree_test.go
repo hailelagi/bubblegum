@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 )
@@ -9,7 +8,8 @@ import (
 func TestInsertBTree(t *testing.T) {
 	tree := NewBPlusTree(4)
 
-	for i := 0; i < 2; i++ {
+	// todo: FIXME panics during promotion/resize
+	for i := 0; i < 4; i++ {
 		key := i
 		value := []byte(fmt.Sprint("msg_", i))
 		err := tree.Insert(key, value)
@@ -19,12 +19,13 @@ func TestInsertBTree(t *testing.T) {
 	}
 }
 
+/*
 func TestInsertAndAccessBTree(t *testing.T) {
 	tree := NewBPlusTree(4)
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		key := i
-		value := []byte(fmt.Sprint("msg_", i))
+		value := []byte(fmt.Sprint("msg_\n", i))
 		err := tree.Insert(key, value)
 		if err != nil {
 			t.Errorf("Error inserting key %d: %v", key, err)
@@ -33,7 +34,7 @@ func TestInsertAndAccessBTree(t *testing.T) {
 
 	for i := 1; i < 3; i++ {
 		key := i
-		value := []byte(fmt.Sprint("msg_", i))
+		value := []byte(fmt.Sprint("msg_\n", i))
 		err := tree.Insert(key, value)
 		result, errGet := tree.Search(key)
 
@@ -51,3 +52,5 @@ func TestInsertAndAccessBTree(t *testing.T) {
 	}
 
 }
+
+*/

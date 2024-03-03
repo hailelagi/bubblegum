@@ -24,14 +24,18 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
 	"errors"
+	"io"
+	"log"
+	"os"
+	"strconv"
 	"sync"
 )
 
 type BPlusTree struct {
 	root   *node
 	degree int
-	access *bufio.ReadWriter
 	sync.RWMutex
 }
 
@@ -44,6 +48,15 @@ type node struct {
 }
 
 func NewBPlusTree(degree int) *BPlusTree {
+	// init the datafile
+	file, err := os.Create("db")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+
 	return &BPlusTree{
 		root:   nil,
 		degree: degree,
@@ -75,18 +88,37 @@ func (t *BPlusTree) Search(key int) ([]byte, error) {
 	if t.root == nil {
 		return []byte{}, errors.New("empty tree")
 	}
-	return t.root.search(key)
+	return t.root.search(t, key)
 }
 
 // insert inserts a key into the n.
-func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) {
+func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
+	file, err := os.OpenFile("db", os.O_RDWR|os.O_APPEND, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	// if we have to open and close a file handle on each call that's bad..
+	// but on the other hand if we hold the handle resource forever..
+	// if only there was something we could do.. a pool perhaps?
+	// "real" persistent B+ trees would never use the open/read/write/seek syscalls anyway.
+	defer file.Close()
+	writer := bufio.NewWriter(file)
+
 	if n.isLeaf {
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
-		// todo actually write and point to the offset as the leaf node
-		// _ := t.access.WriteByte(value)
+
+		// make sure we get to disk
+		_, err := writer.Write(value)
+		fErr := writer.Flush()
+
+		if err != nil || fErr != nil {
+			return err
+		}
 
 		n.keys = append(n.keys, 0)
 		copy(n.keys[i+1:], n.keys[i:])
@@ -102,24 +134,46 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) {
 	if len(n.keys) > degree {
 		n.splitChild(t, len(n.keys)/2, t.degree)
 	}
+
+	return nil
 }
 
-// binary search.
-func (node *node) search(key int) ([]byte, error) {
-	// todo:
+func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
+	file, err := os.OpenFile("db", os.O_RDWR, 0644)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+	reader := bufio.NewReader(file)
+
 	if node.isLeaf {
+		// Binary search for the key in the leaf node's keys
 		low, high := 0, len(node.keys)-1
 		for low <= high {
 			mid := low + (high-low)/2
 			if node.keys[mid] == key {
-				return []byte{byte(mid)}, nil
+				// Calculate the offset and seek to it
+				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
+				if _, err := file.Seek(offset, io.SeekStart); err != nil {
+					return nil, err
+				}
+
+				// read to delimiter
+				value, err := reader.ReadBytes('\n')
+				if err != nil {
+					return nil, err
+				}
+
+				return value, nil
 			} else if node.keys[mid] < key {
 				low = mid + 1
 			} else {
 				high = mid - 1
 			}
 		}
-		return []byte{}, errors.New("key not found")
+		return nil, errors.New("key not found")
 	}
 
 	// If the node is not a leaf node, recursively search in the appropriate child
@@ -127,7 +181,7 @@ func (node *node) search(key int) ([]byte, error) {
 	for i < len(node.keys) && key >= node.keys[i] {
 		i++
 	}
-	return node.children[i].search(key)
+	return node.children[i].search(t, key) // Recursively search in child node
 }
 
 // splitChild splits the child n of the current n at the specified index.
