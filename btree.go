@@ -112,7 +112,7 @@ func (node *node) search(key int) ([]byte, error) {
 		for low <= high {
 			mid := low + (high-low)/2
 			if node.keys[mid] == key {
-				return mid, nil
+				return []byte{byte(mid)}, nil
 			} else if node.keys[mid] < key {
 				low = mid + 1
 			} else {
