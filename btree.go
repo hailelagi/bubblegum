@@ -1,14 +1,13 @@
 /*
-Simple Persistent B Plus Tree.
+A Simple Persistent/On-Disk B Plus Tree.
 n keys are assumed to be signed integers and values a slice of bytes.
-Persistence is achieved using a naive bufio.Writer interface for simplicity.
-Concurrency control is achieved using a simple blocking RWMutex lock.
+Persistence is achieved using a naive IO buffer managed by the OS for simplicity.
+Concurrency control is achieved using a single global blocking RWMutex lock.
 
+NB:
 // B-Tree implementations have many implementation specific details and optimisations before
 // they're 'production' ready, notably they may use a free-list to hold cells in the n,
-// and support concurrency.
- (not implemented or discussed [yet], as // it's better explored as part of chapter 4)
-// see also: CoW semantics
+// employ CoW semantics and support sophisticated concurrency mechanisms.
 
 visualisation: https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
 
@@ -150,7 +149,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 
 	if node.isLeaf {
 		// Binary search for the key in the leaf node's keys
-		low, high := 0, len(node.keys)-1
+		low, high := 0, len(node.parent.keys)-1
 		for low <= high {
 			mid := low + (high-low)/2
 			if node.keys[mid] == key {

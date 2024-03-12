@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 )
@@ -8,13 +9,37 @@ import (
 func TestInsertBTree(t *testing.T) {
 	tree := NewBPlusTree(4)
 
-	// todo: FIXME panics during promotion/resize
+	// TODO(important!) FIXME panics during promotion/resize
 	for i := 0; i < 4; i++ {
 		key := i
 		value := []byte(fmt.Sprint("msg_", i))
 		err := tree.Insert(key, value)
 		if err != nil {
 			t.Errorf("Error inserting key %d: %v", key, err)
+		}
+	}
+}
+
+func TestInsertnSearchBTree(t *testing.T) {
+	tree := NewBPlusTree(4)
+
+	for i := 0; i < 4; i++ {
+		key := i
+		value := []byte(fmt.Sprint("msg_", i))
+
+		err := tree.Insert(key, value)
+		result, errSearch := tree.Search(key)
+
+		if err != nil {
+			t.Errorf("Error inserting key %d: %v", key, err)
+		}
+
+		if errSearch != nil {
+			t.Errorf("Error searching key %d: %v", key, err)
+		}
+
+		if !bytes.Equal(value, result) {
+			t.Errorf("Error result mismatch")
 		}
 	}
 }
