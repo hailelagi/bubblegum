@@ -32,6 +32,9 @@ import (
 	"sync"
 )
 
+const PAGE_SIZE = 4096
+const MAX_NODE_VALUE_SIZE = 500
+
 type BPlusTree struct {
 	root   *node
 	degree int
@@ -40,6 +43,7 @@ type BPlusTree struct {
 
 type node struct {
 	keys     []int
+	pageId   uint64
 	parent   *node
 	next     *node
 	children []*node
@@ -66,13 +70,16 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
+	// root is both a leaf and non-leaf node when there's initially only one node
 	if t.root == nil {
 		t.root = &node{
-			keys:     []int{key},
-			children: []*node{},
+			keys:     []int{},
+			children: nil,
 			isLeaf:   true,
 			next:     nil,
 		}
+
+		t.root.insert(t, key, value, t.degree)
 	} else {
 		t.root.insert(t, key, value, t.degree)
 	}
