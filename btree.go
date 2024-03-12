@@ -32,9 +32,24 @@ import (
 	"sync"
 )
 
-const PAGE_SIZE = 4096
-const MAX_NODE_VALUE_SIZE = 500
+const (
+	// 4KiB
+	PAGE_SIZE = 4096
 
+	// cap key sizes to fit into 8bytes for now
+	MAX_NODE_KEY_SIZE = 8
+	// 500 bytes per message/key's value else overflow
+	MAX_NODE_VALUE_SIZE = 500
+)
+
+type page struct {
+	// todo: decide on file format
+	Id uint64
+}
+
+type cell struct {
+	// todo
+}
 type BPlusTree struct {
 	root   *node
 	degree int
@@ -77,14 +92,13 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 			children: nil,
 			isLeaf:   true,
 			next:     nil,
+			parent:   nil,
+			pageId:   0,
 		}
 
-		t.root.insert(t, key, value, t.degree)
-	} else {
-		t.root.insert(t, key, value, t.degree)
 	}
 
-	return nil
+	return t.root.insert(t, key, value, t.degree)
 }
 
 func (t *BPlusTree) Search(key int) ([]byte, error) {
@@ -112,11 +126,14 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	defer file.Close()
 	writer := bufio.NewWriter(file)
 
+	// todo(FIX ME): this mapping of seperator key -> split is broken
 	if n.isLeaf {
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
+
+		// TODO: seek to correct block position using the pageID
 
 		// make sure we get to disk
 		_, err := writer.Write(value)
@@ -166,6 +183,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 					return nil, err
 				}
 
+				// TODO: factor out when using binary format
 				// read to delimiter
 				value, err := reader.ReadBytes('\n')
 				if err != nil {
