@@ -30,11 +30,59 @@ func TestInsert(t *testing.T) {
 	expectedBuf := make([]byte, testValueSize)
 	_, errRead := file.Read(expectedBuf)
 
-	// do not check the new line delimiter
+	// TODO: refactor this assertion to rely less on magic numbers
+	// ignore the zero byte new line delimiter
 	if !bytes.Equal(value, expectedBuf[:testValueSize-3]) || errRead != nil {
 		t.Errorf("did not write the correct message key")
 	}
 
+}
+
+func TestInsertKeysBeforeSplit(t *testing.T) {
+	tree := NewBPlusTree(4)
+	var expectedKeys []byte
+
+	for i := 1; i < 4; i++ {
+		key := i
+		value := []byte(fmt.Sprint("msg_", i, "\n"))
+		expectedKeys = append(expectedKeys, value...)
+
+		tree.Insert(key, value)
+	}
+
+	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
+	defer file.Close()
+
+	gotBuf := make([]byte, testValueSize*4)
+	_, e := file.Read(gotBuf)
+
+	// TODO: refactor this assertion to rely less on magic numbers
+	if !bytes.Equal(expectedKeys, gotBuf[:testValueSize*4-14]) || e != nil {
+		t.Errorf("Error key does not match result")
+	}
+}
+
+func TestInsertKeysAfterSplit(t *testing.T) {
+	tree := NewBPlusTree(3)
+	var expectedKeys []byte
+
+	for i := 1; i < 7; i++ {
+		key := i
+		value := []byte(fmt.Sprint("msg_", i, "\n"))
+		expectedKeys = append(expectedKeys, value...)
+
+		tree.Insert(key, value)
+	}
+
+	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
+	defer file.Close()
+
+	gotBuf := make([]byte, testValueSize*4)
+	_, e := file.Read(gotBuf)
+
+	if !bytes.Equal(expectedKeys, gotBuf[:testValueSize*4-14]) || e != nil {
+		t.Errorf("Error key does not match result")
+	}
 }
 
 /*
