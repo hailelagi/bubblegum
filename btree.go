@@ -1,27 +1,3 @@
-/*
-A 'simple' Persistent/On-Disk B Plus Tree.
-node keys are assumed to be signed integers and values a slice of bytes.
-Persistence is achieved using a naive IO buffer managed by the OS for simplicity.
-Concurrency control is achieved using a single global blocking RWMutex lock.
-
-NB:
-// B-Tree implementations have many implementation specific details and optimisations before
-// they're 'production' ready, notably they may use a free-list to hold cells in the leaf nodes,
-// employ CoW semantics and support sophisticated concurrency mechanisms.
-
-// FILE FORMAT
-// todo!
-
-visualisation: https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
-
-// learn more:
-// etcd: https://pkg.go.dev/github.com/google/btree
-// sqlite: https://sqlite.org/src/file/src/btree.c
-// wiki: https://en.wikipedia.org/wiki/B%2B_tree
-
-pseudocode: http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
-*/
-
 package main
 
 import (
@@ -199,9 +175,10 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	defer file.Close()
 	reader := bufio.NewReader(file)
 
-	if node.kind == LEAF_NODE {
-		// Binary search for the key in the leaf node's keys
-		low, high := 0, len(node.parent.keys)-1
+	// Binary search for the key
+	if node.kind == LEAF_NODE || node.kind == ROOT_NODE {
+		low, high := 0, len(node.keys)-1
+
 		for low <= high {
 			mid := low + (high-low)/2
 			if node.keys[mid] == key {

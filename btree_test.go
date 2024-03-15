@@ -81,12 +81,11 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	_, e := file.Read(gotBuf)
 
 	// TODO: make this test less dumb
-	if !bytes.Equal(expectedKeys[:testValueSize], gotBuf[:testValueSize]) || e != nil {
+	if !bytes.Equal(expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4]) || e != nil {
 		t.Errorf("keys does not match result expected %v %v", expectedKeys, gotBuf)
 	}
 }
 
-/*
 func TestInsertAnDSearchBTree(t *testing.T) {
 	tree := NewBPlusTree(4)
 
@@ -105,8 +104,6 @@ func TestInsertAnDSearchBTree(t *testing.T) {
 		t.Errorf("Error result mismatch")
 	}
 }
-
-*/
 
 /*
 func TestInsertAndAccessBTree(t *testing.T) {
