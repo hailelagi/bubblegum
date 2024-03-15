@@ -1,13 +1,16 @@
 /*
-A Simple Persistent/On-Disk B Plus Tree.
-n keys are assumed to be signed integers and values a slice of bytes.
+A 'simple' Persistent/On-Disk B Plus Tree.
+node keys are assumed to be signed integers and values a slice of bytes.
 Persistence is achieved using a naive IO buffer managed by the OS for simplicity.
 Concurrency control is achieved using a single global blocking RWMutex lock.
 
 NB:
 // B-Tree implementations have many implementation specific details and optimisations before
-// they're 'production' ready, notably they may use a free-list to hold cells in the n,
+// they're 'production' ready, notably they may use a free-list to hold cells in the leaf nodes,
 // employ CoW semantics and support sophisticated concurrency mechanisms.
+
+// FILE FORMAT
+// todo!
 
 visualisation: https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
 
@@ -35,21 +38,40 @@ import (
 const (
 	// 4KiB
 	PAGE_SIZE = 4096
-
 	// cap key sizes to fit into 8bytes for now
 	MAX_NODE_KEY_SIZE = 8
 	// 500 bytes per message/key's value else overflow
 	MAX_NODE_VALUE_SIZE = 500
 )
 
+type nodeType int
+
+// oh go, where art thy sum types? thine enums forsake me :(
+const (
+	ROOT_NODE nodeType = iota
+	INTERNAL_NODE
+	LEAF_NODE
+)
+
+// a contigous 4kiB chunck of memory
 type page struct {
-	// todo: decide on file format
-	Id uint64
+	id    uint64
+	cells []cell
 }
 
+// cell's are either:
+// a key cell - holds only seperator keys and pointers to pages between neighbours
+// a key/value cell - holds keys and data records ie isKeyCell = false
 type cell struct {
-	// todo
+	pageId    uint64
+	isKeyCell bool
+	keySize   uint64
+	valueSize uint64
+	// tbd: maybe simplify by using int
+	keyBytes   []byte
+	dataRecord []byte
 }
+
 type BPlusTree struct {
 	root   *node
 	degree int
@@ -61,8 +83,9 @@ type node struct {
 	pageId   uint64
 	parent   *node
 	next     *node
+	sibling  *node
 	children []*node
-	isLeaf   bool
+	kind     nodeType
 }
 
 func NewBPlusTree(degree int) *BPlusTree {
@@ -85,12 +108,12 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	// root is both a leaf and non-leaf node when there's initially only one node
 	if t.root == nil {
 		t.root = &node{
-			keys:     []int{},
+			kind:     ROOT_NODE,
+			keys:     nil,
 			children: nil,
-			isLeaf:   true,
+			sibling:  nil,
 			next:     nil,
 			parent:   nil,
 			pageId:   0,
@@ -111,7 +134,6 @@ func (t *BPlusTree) Search(key int) ([]byte, error) {
 	return t.root.search(t, key)
 }
 
-// insert inserts a key into the n.
 func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	file, err := os.OpenFile("db", os.O_RDWR|os.O_APPEND, 0644)
 
@@ -127,14 +149,14 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	writer := bufio.NewWriter(file)
 
 	// todo(FIX ME): this mapping of seperator key -> split is broken
-	if n.isLeaf {
+	switch n.kind {
+	case ROOT_NODE, LEAF_NODE:
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
 
 		// TODO: seek to correct block position using the pageID
-
 		// make sure we get to disk
 		_, err := writer.Write(value)
 		fErr := writer.Flush()
@@ -146,14 +168,14 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 		n.keys = append(n.keys, 0)
 		copy(n.keys[i+1:], n.keys[i:])
 		n.keys[i] = key
-
-	} else {
+	case INTERNAL_NODE:
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
 		n.children[i].insert(t, key, value, degree)
 	}
+
 	if len(n.keys) > degree {
 		n.splitChild(t, len(n.keys)/2, t.degree)
 	}
@@ -171,7 +193,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	defer file.Close()
 	reader := bufio.NewReader(file)
 
-	if node.isLeaf {
+	if node.kind == LEAF_NODE {
 		// Binary search for the key in the leaf node's keys
 		low, high := 0, len(node.parent.keys)-1
 		for low <= high {
@@ -214,7 +236,7 @@ func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	newNode := &node{
 		keys:     make([]int, len(n.keys)-index),
 		children: make([]*node, len(n.children)-index),
-		isLeaf:   n.isLeaf,
+		kind:     LEAF_NODE,
 		next:     n.next,
 	}
 
@@ -225,16 +247,16 @@ func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	n.children = n.children[:index]
 
 	// If the n is a leaf n, set the next pointer of the current n to the new n
-	if n.isLeaf {
+	if n.kind == LEAF_NODE {
 		n.next = newNode
 	}
 
 	// If the current n is the root, create a new root and add the median key
-	if n == t.root {
+	if n.kind == ROOT_NODE {
 		newRoot := &node{
 			keys:     []int{newNode.keys[0]},
 			children: []*node{n, newNode},
-			isLeaf:   false,
+			kind:     ROOT_NODE,
 		}
 		t.root = newRoot
 		return

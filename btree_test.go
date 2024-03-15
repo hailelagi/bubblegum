@@ -11,8 +11,8 @@ var key = 1
 var value = []byte(fmt.Sprint("msg_", key))
 var testValueSize = cap(value)
 
-func TestInsert(t *testing.T) {
-	tree := NewBPlusTree(4)
+func TestInsertRoot(t *testing.T) {
+	tree := NewBPlusTree(1)
 
 	errInsert := tree.Insert(key, value)
 	file, errOpen := os.OpenFile("db", os.O_RDONLY, 0644)
@@ -33,13 +33,13 @@ func TestInsert(t *testing.T) {
 	// TODO: refactor this assertion to rely less on magic numbers
 	// ignore the zero byte new line delimiter
 	if !bytes.Equal(value, expectedBuf[:testValueSize-3]) || errRead != nil {
-		t.Errorf("did not write the correct message key")
+		t.Errorf("did not write the correct message key %v expected %v", value, expectedBuf)
 	}
 
 }
 
 func TestInsertKeysBeforeSplit(t *testing.T) {
-	tree := NewBPlusTree(4)
+	tree := NewBPlusTree(3)
 	var expectedKeys []byte
 
 	for i := 1; i < 4; i++ {
@@ -81,7 +81,7 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	_, e := file.Read(gotBuf)
 
 	if !bytes.Equal(expectedKeys, gotBuf[:testValueSize*4-14]) || e != nil {
-		t.Errorf("Error key does not match result")
+		t.Errorf("keys does not match result expected %v %v", expectedKeys, gotBuf)
 	}
 }
 
