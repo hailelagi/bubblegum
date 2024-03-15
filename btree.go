@@ -63,7 +63,7 @@ type page struct {
 // a key cell - holds only seperator keys and pointers to pages between neighbours
 // a key/value cell - holds keys and data records ie isKeyCell = false
 type cell struct {
-	pageId    uint64
+	pageId    int64
 	isKeyCell bool
 	keySize   uint64
 	valueSize uint64
@@ -80,7 +80,7 @@ type BPlusTree struct {
 
 type node struct {
 	keys     []int
-	pageId   uint64
+	pageId   int64
 	parent   *node
 	next     *node
 	sibling  *node
@@ -146,26 +146,32 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	// if only there was something we could do.. a pool perhaps?
 	// "real" persistent B+ trees would never use the open/read/write/seek syscalls anyway.
 	defer file.Close()
-	writer := bufio.NewWriter(file)
 
 	// todo(FIX ME): this mapping of seperator key -> split is broken
 	switch n.kind {
-	case ROOT_NODE, LEAF_NODE:
+	case ROOT_NODE:
+		if len(n.keys) > degree {
+			n.splitChild(t, len(n.keys)/2, t.degree)
+		} else {
+			offset, err := syncToOffset(file, value)
+			if err != nil {
+				return err
+			}
+			n.pageId = offset
+		}
+	case LEAF_NODE:
 		i := 0
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
 
-		// TODO: seek to correct block position using the pageID
-		// make sure we get to disk
-		_, err := writer.Write(value)
-		fErr := writer.Flush()
+		offset, err := syncToOffset(file, value)
 
-		if err != nil || fErr != nil {
+		if err != nil {
 			return err
 		}
 
-		n.keys = append(n.keys, 0)
+		n.keys = append(n.keys, int(offset))
 		copy(n.keys[i+1:], n.keys[i:])
 		n.keys[i] = key
 	case INTERNAL_NODE:
@@ -275,4 +281,28 @@ func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	if len(parent.keys) > degree {
 		parent.splitChild(t, len(parent.keys)/2, degree)
 	}
+}
+
+func syncToOffset(file *os.File, value []byte) (int64, error) {
+	writer := bufio.NewWriter(file)
+	// seek to correct block position using the pageID
+	// make sure we get to disk
+	_, err := writer.Write(value)
+	fErr := writer.Flush()
+
+	if err != nil {
+		return 0, err
+	}
+
+	if fErr != nil {
+		return 0, fErr
+	}
+
+	offset, err := file.Seek(0, os.SEEK_CUR)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return offset, nil
 }
