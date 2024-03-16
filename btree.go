@@ -55,13 +55,14 @@ type BPlusTree struct {
 }
 
 type node struct {
-	keys     []int
-	pageId   int64
-	parent   *node
-	next     *node
-	sibling  *node
-	children []*node
-	kind     nodeType
+	kind         nodeType
+	pageId       int64
+	keys         []int
+	next         *node
+	parent       *node
+	leftSibling  *node
+	rightSibling *node
+	children     []*node
 }
 
 func NewBPlusTree(degree int) *BPlusTree {
@@ -86,13 +87,14 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 
 	if t.root == nil {
 		t.root = &node{
-			kind:     ROOT_NODE,
-			keys:     nil,
-			children: nil,
-			sibling:  nil,
-			next:     nil,
-			parent:   nil,
-			pageId:   0,
+			kind:         ROOT_NODE,
+			keys:         nil,
+			children:     nil,
+			leftSibling:  nil,
+			rightSibling: nil,
+			next:         nil,
+			parent:       nil,
+			pageId:       0,
 		}
 
 	}
