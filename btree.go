@@ -81,17 +81,7 @@ func NewBPlusTree(degree int) *BPlusTree {
 	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
 
 	return &BPlusTree{
-		root:   nil,
-		degree: degree,
-	}
-}
-
-func (t *BPlusTree) Insert(key int, value []byte) error {
-	t.Lock()
-	defer t.Unlock()
-
-	if t.root == nil {
-		t.root = &node{
+		root: &node{
 			kind:         ROOT_NODE,
 			keys:         nil,
 			children:     nil,
@@ -100,10 +90,16 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 			next:         nil,
 			parent:       nil,
 			pageId:       0,
-		}
-
+		},
+		degree: degree,
 	}
+}
 
+func (t *BPlusTree) Insert(key int, value []byte) error {
+	t.Lock()
+	defer t.Unlock()
+
+	// todo handle casting into/from datatypes
 	return t.root.insert(t, key, value, t.degree)
 }
 
@@ -111,9 +107,14 @@ func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	if t.root == nil {
-		return []byte{}, errors.New("empty tree")
-	}
+	// todo handle casting into/from datatypes
+	return t.root.search(t, key)
+}
+
+func (t *BPlusTree) Delete(key int) ([]byte, error) {
+	t.Lock()
+	defer t.Unlock()
+
 	return t.root.search(t, key)
 }
 
@@ -217,6 +218,19 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 		i++
 	}
 	return node.children[i].search(t, key) // Recursively search in child node
+}
+
+func (node *node) delete(t *BPlusTree, key, degree int) bool {
+	// find node using key
+	return node.stealSibling(t, degree) || node.mergeChildren(t, degree)
+}
+
+func (node *node) stealSibling(t *BPlusTree, degree int) bool {
+	return false
+}
+
+func (node *node) mergeChildren(t *BPlusTree, degree int) bool {
+	return false
 }
 
 // splitChild splits the child n of the current n at the specified index.
