@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 )
@@ -111,11 +112,11 @@ func (t *BPlusTree) Search(key int) ([]byte, error) {
 	return t.root.search(t, key)
 }
 
-func (t *BPlusTree) Delete(key int) ([]byte, error) {
+func (t *BPlusTree) Delete(key int) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.search(t, key)
+	return t.root.delete(t, key, t.degree)
 }
 
 func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
@@ -158,6 +159,7 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 		}
 
 		n.keys = append(n.keys, int(offset))
+		slices.Sort(n.keys)
 		copy(n.keys[i+1:], n.keys[i:])
 		n.keys[i] = key
 	case INTERNAL_NODE:
@@ -223,17 +225,34 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	return node.children[i].search(t, key) // Recursively search in child node
 }
 
-func (node *node) delete(t *BPlusTree, key, degree int) bool {
+func (node *node) delete(t *BPlusTree, key, degree int) error {
 	// find node using key
-	return node.stealSibling(t, degree) || node.mergeChildren(t, degree)
+	// pass in node, to node stealSibling
+	// assume node is root at first
+	// this an optimisation maybe do later
+	ok, err := node.stealSibling(t, degree)
+
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		err := node.mergeChildren(t, degree)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (node *node) stealSibling(t *BPlusTree, degree int) bool {
-	return false
+func (node *node) stealSibling(t *BPlusTree, degree int) (bool, error) {
+	return false, nil
 }
 
-func (node *node) mergeChildren(t *BPlusTree, degree int) bool {
-	return false
+func (node *node) mergeChildren(t *BPlusTree, degree int) error {
+	return nil
 }
 
 // splitChild splits the child n of the current n at the specified index.

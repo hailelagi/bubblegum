@@ -82,7 +82,7 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
 
-func TestInsertAnDSearchBTree(t *testing.T) {
+func TestInsertAnDSearchRoot(t *testing.T) {
 	tree := NewBPlusTree(4)
 
 	err := tree.Insert(key, value)
