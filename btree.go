@@ -127,8 +127,11 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 
 	// if we have to open and close a file handle on each call that's bad..
 	// but on the other hand if we hold the handle resource forever..
-	// if only there was something we could do.. a pool perhaps?
-	// "real" persistent B+ trees would never use the open/read/write/seek syscalls anyway.
+	// we would want to bind the lifetime of the file descriptor to the DB process/struct.
+	// or use a memory pool if pages aren't structured in a single file see for e.g Postgres.
+	// "real" persistent B+ trees would use the open/read/write/seek syscalls differently.
+	// see: https://www.sqlite.org/mmap.html
+
 	defer file.Close()
 
 	switch n.kind {
