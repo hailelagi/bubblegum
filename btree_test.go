@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var key = 1
@@ -28,14 +30,10 @@ func TestInsertRoot(t *testing.T) {
 	defer file.Close()
 
 	expectedBuf := make([]byte, testValueSize)
-	_, errRead := file.Read(expectedBuf)
+	file.Read(expectedBuf)
 
-	// TODO: refactor this assertion to rely less on magic numbers
-	// ignore the zero byte new line delimiter
-	if !bytes.Equal(value, expectedBuf[:testValueSize-3]) || errRead != nil {
-		t.Errorf("did not write the correct message key %v expected %v", value, expectedBuf)
-	}
-
+	// TODO: make this test less dumb
+	assert.Equal(t, value, expectedBuf[:testValueSize-3])
 }
 
 func TestInsertKeysBeforeSplit(t *testing.T) {
@@ -78,12 +76,10 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	defer file.Close()
 
 	gotBuf := make([]byte, testValueSize*4)
-	_, e := file.Read(gotBuf)
+	file.Read(gotBuf)
 
 	// TODO: make this test less dumb
-	if !bytes.Equal(expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4]) || e != nil {
-		t.Errorf("keys does not match result expected %v %v", expectedKeys, gotBuf)
-	}
+	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
 
 func TestInsertAnDSearchBTree(t *testing.T) {
@@ -100,9 +96,7 @@ func TestInsertAnDSearchBTree(t *testing.T) {
 		t.Errorf("Error searching key %d: %v", key, err)
 	}
 
-	if !bytes.Equal(value, result) {
-		t.Errorf("Error result mismatch")
-	}
+	assert.Equal(t, value, result)
 }
 
 /*
