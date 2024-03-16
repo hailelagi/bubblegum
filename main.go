@@ -40,3 +40,10 @@ func main() {
 	// TODO: this should not be nil
 	fmt.Println(tree.root.next)
 }
+
+// why? see: https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety
+func Assert(cond bool, errMsg string, v ...any) {
+	if !cond {
+		panic(fmt.Sprintf("runtime invariant failure: "+errMsg, v...))
+	}
+}

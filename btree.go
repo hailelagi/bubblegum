@@ -29,7 +29,7 @@ const (
 	LEAF_NODE
 )
 
-// a contigous 4kiB chunck of memory
+// a contigous 4kiB chunk of memory
 type page struct {
 	id    uint64
 	cells []cell
@@ -74,6 +74,11 @@ func NewBPlusTree(degree int) *BPlusTree {
 	}
 
 	defer file.Close()
+
+	// invariant one: 2 <= no of children < 2 * branching factor
+	// number of keys = no. of children/degree - 1
+	// branching factor - 1 < num keys < 2 * branching factor - 1
+	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
 
 	return &BPlusTree{
 		root:   nil,
@@ -125,7 +130,6 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	// "real" persistent B+ trees would never use the open/read/write/seek syscalls anyway.
 	defer file.Close()
 
-	// todo(FIX ME): this mapping of seperator key -> split is broken
 	switch n.kind {
 	case ROOT_NODE:
 		if len(n.keys) > degree {

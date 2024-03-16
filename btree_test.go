@@ -14,7 +14,7 @@ var value = []byte(fmt.Sprint("msg_", key))
 var testValueSize = cap(value)
 
 func TestInsertRoot(t *testing.T) {
-	tree := NewBPlusTree(1)
+	tree := NewBPlusTree(2)
 
 	errInsert := tree.Insert(key, value)
 	file, errOpen := os.OpenFile("db", os.O_RDONLY, 0644)
