@@ -229,7 +229,7 @@ func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	n.keys = n.keys[:index]
 	n.children = n.children[:index]
 
-	// If the n is a leaf n, set the next pointer of the current n to the new n
+	// TODO(FIXME): next is not set correctly
 	if n.kind == LEAF_NODE {
 		n.next = newNode
 	}
@@ -275,7 +275,7 @@ func syncToOffset(file *os.File, value []byte) (int64, error) {
 		return 0, fErr
 	}
 
-	offset, err := file.Seek(0, os.SEEK_CUR)
+	offset, err := file.Seek(0, io.SeekCurrent)
 
 	if err != nil {
 		return 0, err

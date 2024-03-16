@@ -25,21 +25,18 @@ pseudocode: http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
 */
 
 import (
-	"bytes"
 	"fmt"
 )
 
 func main() {
 	tree := NewBPlusTree(4)
 
-	for i := 1; i < 4; i++ {
+	for i := 1; i < 10; i++ {
 		key := i
-		value := []byte(fmt.Sprint("msg_\n", i))
+		value := []byte(fmt.Sprint("msg_", i, "\n"))
 		tree.Insert(key, value)
-		result, _ := tree.Search(key)
-
-		if !bytes.Equal(value, result) {
-			panic("non matching insert and access result")
-		}
 	}
+
+	// TODO: this should not be nil
+	fmt.Println(tree.root.next)
 }
