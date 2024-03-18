@@ -85,8 +85,13 @@ func (p *Page) Flush(file *os.File, startOffSet int64) error {
 	// Write the page bytes to the file at the calculated offsets
 	// TODO(nice-to-have): checksum pages using md5
 	n, err := file.WriteAt(pageBytes, int64(p.offsetBegin))
+	syncErr := file.Sync()
 
 	if err != nil {
+		return err
+	}
+
+	if syncErr != nil {
 		return err
 	}
 

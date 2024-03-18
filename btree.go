@@ -131,7 +131,8 @@ func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, degree
 	}
 
 	if len(n.keys) > degree {
-		n.splitChild(t, len(n.keys)/2, t.degree)
+		// wtf
+		n.splitChild(t, 0, t.degree)
 	}
 
 	return nil
@@ -237,8 +238,8 @@ func (node *node) mergeChildren(t *BPlusTree, degree int) error {
 func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	// Create a new n to hold the keys and children that will be moved
 	newNode := &node{
-		keys:     make([]int, len(n.keys)-index),
-		children: make([]*node, len(n.children)-index),
+		keys:     make([]int, t.degree),
+		children: make([]*node, t.degree),
 		kind:     LEAF_NODE,
 		next:     n.next,
 	}

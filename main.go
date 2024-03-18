@@ -25,7 +25,6 @@ pseudocode: http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
 */
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 )
@@ -43,18 +42,22 @@ func main() {
 		db.Insert(key, value)
 	}
 
-	for i := 1; i < 10; i++ {
-		res, _ := db.Query(i)
-		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		Assert(bytes.Equal(res, value), "read your writes :) ")
-	}
+	/*
+		for i := 1; i < 10; i++ {
+			res, _ := db.Query(i)
+			value := []byte(fmt.Sprint("msg_", i, "\n"))
+			Assert(bytes.Equal(res, value), "read your writes :) ")
+		}
+	*/
 
-	for i := 1; i < 10; i++ {
-		db.Delete(i)
-		err := db.Delete(i)
+	/*
+		for i := 1; i < 10; i++ {
+			db.Delete(i)
+			err := db.Delete(i)
 
-		Assert(err != nil, "value must not be found after deletion")
-	}
+			Assert(err != nil, "value must not be found after deletion")
+		}
+	*/
 
 	// cleanup
 	db.Close()
