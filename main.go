@@ -25,20 +25,39 @@ pseudocode: http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
 */
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 )
 
 func main() {
-	tree := NewBPlusTree(4)
+	db, err := InitDB(NewBPlusTree(4))
+
+	if err != nil {
+		log.Fatalf("could not init database cause: %v", err)
+	}
 
 	for i := 1; i < 10; i++ {
 		key := i
 		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		tree.Insert(key, value)
+		db.Insert(key, value)
 	}
 
-	// TODO: this should not be nil
-	fmt.Println(tree.root.next)
+	for i := 1; i < 10; i++ {
+		res, _ := db.Query(i)
+		value := []byte(fmt.Sprint("msg_", i, "\n"))
+		Assert(bytes.Equal(res, value), "read your writes :) ")
+	}
+
+	for i := 1; i < 10; i++ {
+		db.Delete(i)
+		err := db.Delete(i)
+
+		Assert(err != nil, "value must not be found after deletion")
+	}
+
+	// cleanup
+	db.Close()
 }
 
 // why? see: https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety

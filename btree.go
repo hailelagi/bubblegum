@@ -25,6 +25,9 @@ const (
 type BPlusTree struct {
 	root   *node
 	degree int
+
+	// TODO: idk this use of indirect cyclical pointers feels bad
+	db *DB
 	sync.RWMutex
 }
 
@@ -40,21 +43,16 @@ type node struct {
 }
 
 func NewBPlusTree(degree int) *BPlusTree {
-	// init the datafile
-	file, err := os.Create("db")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer file.Close()
-
 	// invariant one: 2 <= no of children < 2 * branching factor
 	// number of keys = no. of children/degree - 1
 	// branching factor - 1 < num keys < 2 * branching factor - 1
 	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
+	rootPage, err := NewPage()
 
-	// todo: preallocated 4kiB for a node
+	if err != nil {
+		log.Fatal("root node pre-allocation failure")
+	}
+
 	return &BPlusTree{
 		root: &node{
 			kind: ROOT_NODE,
@@ -65,7 +63,7 @@ func NewBPlusTree(degree int) *BPlusTree {
 			rightSibling: nil,
 			next:         nil,
 			parent:       nil,
-			pageId:       0,
+			pageId:       rootPage.id,
 		},
 		degree: degree,
 	}
@@ -75,41 +73,24 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	// todo handle casting into/from datatypes
-	return t.root.insert(t, key, value, t.degree)
+	return t.root.insert(t, t.db.datafile, key, value, t.degree)
 }
 
 func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	// todo handle casting into/from datatypes
-	return t.root.search(t, key)
+	return t.root.search(t, t.db.datafile, key)
 }
 
 func (t *BPlusTree) Delete(key int) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.delete(t, key, t.degree)
+	return t.root.delete(t, t.db.datafile, key, t.degree)
 }
 
-func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
-	file, err := os.OpenFile("db", os.O_RDWR|os.O_APPEND, 0644)
-
-	if err != nil {
-		return err
-	}
-
-	// if we have to open and close a file handle on each call that's bad..
-	// but on the other hand if we hold the handle resource forever..
-	// we would want to bind the lifetime of the file descriptor to the DB process/struct.
-	// or use a memory pool if pages aren't structured in a single file see for e.g Postgres.
-	// "real" persistent B+ trees would use the open/read/write/seek syscalls differently.
-	// see: https://www.sqlite.org/mmap.html
-
-	defer file.Close()
-
+func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, degree int) error {
 	switch n.kind {
 	case ROOT_NODE:
 		if len(n.keys) > degree {
@@ -146,7 +127,7 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
-		n.children[i].insert(t, key, value, degree)
+		n.children[i].insert(t, file, key, value, degree)
 	}
 
 	if len(n.keys) > degree {
@@ -156,19 +137,10 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	return nil
 }
 
-func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
-	file, err := os.OpenFile("db", os.O_RDWR, 0644)
-
-	if err != nil {
-		return nil, err
-	}
-
+func (node *node) search(t *BPlusTree, file *os.File, key int) ([]byte, error) {
 	fmt.Println(node.kind)
-
-	defer file.Close()
-	reader := bufio.NewReader(file)
-
 	fmt.Println(node.keys)
+	reader := bufio.NewReader(file)
 
 	if node.kind == ROOT_NODE {
 		for _, k := range node.keys {
@@ -231,7 +203,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	return nil, nil
 }
 
-func (node *node) delete(t *BPlusTree, key, degree int) error {
+func (node *node) delete(t *BPlusTree, file *os.File, key int, degree int) error {
 	// find node using key
 	// pass in node, to node stealSibling
 	// assume node is root at first

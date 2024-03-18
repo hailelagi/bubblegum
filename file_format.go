@@ -21,7 +21,7 @@ const (
 // a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
 type Page struct {
 	// the page ID
-	id uint64
+	id int64
 	// the physical offset mapping to the begining
 	// and end of an allocated virtual memory segment block on the datafile "db"
 	offsetBegin int64
@@ -41,6 +41,17 @@ type cell struct {
 	// tbd: maybe simplify by using int
 	keyBytes   []byte
 	dataRecord []byte
+}
+
+func NewPage() (*Page, error) {
+	page := Page{}
+	_, err := page.Allocate()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &page, nil
 }
 
 func (p *Page) Allocate() (uint32, error) {
