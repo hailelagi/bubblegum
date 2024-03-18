@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -30,10 +31,15 @@ const (
 	LEAF_NODE
 )
 
-// a contigous 4kiB chunk of memory
+// a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
 type page struct {
-	id    uint64
-	cells []cell
+	// the page ID
+	id uint64
+	// the physical offset mapping to the begining
+	// and end of the block on the datafile "db"
+	offsetBegin uint32
+	offsetEnd   uint32
+	cells       []cell
 }
 
 // cell's are either:
@@ -83,9 +89,10 @@ func NewBPlusTree(degree int) *BPlusTree {
 
 	return &BPlusTree{
 		root: &node{
-			kind:         ROOT_NODE,
-			keys:         nil,
-			children:     nil,
+			kind: ROOT_NODE,
+			// todo: use MAX_KEY and MAX CHILDREN
+			keys:         make([]int, 0),
+			children:     make([]*node, 0),
 			leftSibling:  nil,
 			rightSibling: nil,
 			next:         nil,
@@ -145,6 +152,10 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 				return err
 			}
 			n.pageId = offset
+
+			// TODO: this key thing
+			// do you map offsets to the id directly?
+			n.keys = append(n.keys, int(offset))
 		}
 	case LEAF_NODE:
 		i := 0
@@ -184,11 +195,33 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 		return nil, err
 	}
 
+	fmt.Println(node.kind)
+
 	defer file.Close()
 	reader := bufio.NewReader(file)
 
+	fmt.Println(node.keys)
+
+	if node.kind == ROOT_NODE {
+		for _, k := range node.keys {
+			if k == key {
+				fmt.Println("Iam not crazy")
+				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(k))))
+				if _, err := file.Seek(offset, io.SeekStart); err != nil {
+					return nil, err
+				}
+
+				value, err := reader.ReadBytes('\n')
+
+				if err != nil {
+					return value, nil
+				}
+			}
+		}
+	}
+
 	// Binary search for the key
-	if node.kind == LEAF_NODE || node.kind == ROOT_NODE {
+	if node.kind == LEAF_NODE {
 		low, high := 0, len(node.keys)-1
 
 		for low <= high {
@@ -217,12 +250,17 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 		return nil, errors.New("key not found")
 	}
 
-	// If the node is not a leaf node, recursively search in the appropriate child
-	i := 0
-	for i < len(node.keys) && key >= node.keys[i] {
-		i++
-	}
-	return node.children[i].search(t, key) // Recursively search in child node
+	/*
+		// If the node is not a leaf node, recursively search in the appropriate child
+		i := 0
+		for i < len(node.keys) && key >= node.keys[i] {
+			i++
+		}
+
+		return node.children[i].search(t, key) // Recursively search in child node
+	*/
+
+	return nil, nil
 }
 
 func (node *node) delete(t *BPlusTree, key, degree int) error {
