@@ -13,15 +13,6 @@ import (
 	"sync"
 )
 
-const (
-	// 4KiB
-	PAGE_SIZE = 4096
-	// cap key sizes to fit into 8bytes for now
-	MAX_NODE_KEY_SIZE = 8
-	// 500 bytes per message/key's value else overflow
-	MAX_NODE_VALUE_SIZE = 500
-)
-
 type nodeType int
 
 // oh go, where art thy sum types? thine enums forsake me :(
@@ -30,30 +21,6 @@ const (
 	INTERNAL_NODE
 	LEAF_NODE
 )
-
-// a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
-type page struct {
-	// the page ID
-	id uint64
-	// the physical offset mapping to the begining
-	// and end of the block on the datafile "db"
-	offsetBegin uint32
-	offsetEnd   uint32
-	cells       []cell
-}
-
-// cell's are either:
-// a key cell - holds only seperator keys and pointers to pages between neighbours
-// a key/value cell - holds keys and data records ie isKeyCell = false
-type cell struct {
-	pageId    int64
-	isKeyCell bool
-	keySize   uint64
-	valueSize uint64
-	// tbd: maybe simplify by using int
-	keyBytes   []byte
-	dataRecord []byte
-}
 
 type BPlusTree struct {
 	root   *node
@@ -87,6 +54,7 @@ func NewBPlusTree(degree int) *BPlusTree {
 	// branching factor - 1 < num keys < 2 * branching factor - 1
 	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
 
+	// todo: preallocated 4kiB for a node
 	return &BPlusTree{
 		root: &node{
 			kind: ROOT_NODE,
