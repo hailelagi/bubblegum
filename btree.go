@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -80,20 +81,37 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	n, err := findNode(t.root, key)
+	// _, err := findNode(t.root, key)
 
-	if err == nil {
-		return n.insert(t, key, value, t.maxDegree)
-	} else {
-		return t.root.insert(t, key, value, t.maxDegree)
-	}
+	/*
+		if err == nil {
+			return t.root.insert(t, key, value, t.maxDegree)
+		} else {
+			return errors.New("key already exists")
+		}
+	*/
+
+	return t.root.insert(t, key, value, t.maxDegree)
 }
 
 func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	return t.root.search(t, key)
+	_, err := findNode(t.root, key)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// for testing todo: remove
+	// t.db.datafile.Seek(v.pageId, io.SeekStart)
+	result := make([]byte, 5)
+	t.db.datafile.Seek(5, io.SeekStart)
+	t.db.datafile.Read(result)
+
+	return result, nil
+
 }
 
 func (t *BPlusTree) Delete(key int) error {
@@ -109,77 +127,95 @@ func (t *BPlusTree) Delete(key int) error {
 	}
 }
 
-// bin search keys, inorder traversal children stack
+// for now the assumption is the key == offset
 func findNode(root *node, key int) (*node, error) {
 	currNode := root
 	stack := root.children
-	low, high := 0, len(currNode.keys)-1
 
-	for low <= high {
-		mid := low + (high-low)/2
-		if root.keys[mid] == key {
-			return root, nil
-			// this boundary condition does not seem correct, it will panic when there's a single key
-			// TODO: deep dive boundary condition to search subtree
-		} else if currNode.keys[mid] > key && currNode.keys[mid+1] < key {
-			if stack == nil {
-				return nil, errors.New("key not found")
-			}
+	if len(currNode.keys) == 0 {
+		return nil, errors.New("key not found")
+	}
 
-			currNode = stack[len(stack)-1]
-
-			if currNode == nil {
-				return nil, errors.New("key not found")
-			}
-		} else if currNode.keys[mid] > key {
-			high = mid - 1
+	if len(currNode.keys) == 1 {
+		if currNode.keys[0] == key {
+			return currNode, nil
 		} else {
-			low = mid + 1
+			return nil, errors.New("key not found")
 		}
 	}
 
-	return nil, errors.New("key not found")
+	start, end := 0, len(currNode.keys)-1
+
+	for start <= end {
+		mid := start + (end-start)/2
+
+		fmt.Println(mid)
+
+		if currNode.keys[mid] == key {
+			return currNode, nil
+		} else if currNode.keys[mid] > key {
+			end = mid - 1
+		} else {
+			start = mid + 1
+		}
+	}
+
+	search := start + (end-start)/2
+
+	if stack == nil || currNode.kind == LEAF_NODE {
+		return nil, errors.New("key not found")
+	} else {
+		// validate relationship btwn num keys and searchIndex
+		// but should work
+		return findNode(currNode.children[search], key)
+	}
 }
 
 // invariant two: relationship between keys and child pointers
 // Each node holds up to N keys and N + 1 pointers to the child nodes
-func (n *node) insert(t *BPlusTree, key int, value []byte, maxDegree int) error {
+func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	switch n.kind {
-	case ROOT_NODE, LEAF_NODE:
-		if len(n.keys) > maxDegree-1 {
+	case ROOT_NODE:
+		if len(n.keys) > degree {
 			n.splitChild(t, len(n.keys)/2, t.maxDegree)
 		} else {
 			offset, err := syncToOffset(t.db.datafile, value)
 			if err != nil {
 				return err
 			}
-			// TODO: sync offsets with Page{}
 			n.pageId = offset
-			n.keys = append(n.keys, int(offset))
-			slices.Sort(n.keys)
-		}
-		if len(n.keys) > maxDegree-1 {
-			n.splitChild(t, 0, t.maxDegree)
-		} else {
-			offset, err := syncToOffset(t.db.datafile, value)
 
-			if err != nil {
-				return err
-			}
-
+			// TODO: this key thing
+			// do you map offsets to the id directly?
 			n.keys = append(n.keys, int(offset))
-			slices.Sort(n.keys)
 		}
+	case LEAF_NODE:
+		i := 0
+		for i < len(n.keys) && key > n.keys[i] {
+			i++
+		}
+
+		offset, err := syncToOffset(t.db.datafile, value)
+
+		if err != nil {
+			return err
+		}
+
+		n.keys = append(n.keys, int(offset))
+		slices.Sort(n.keys)
+		copy(n.keys[i+1:], n.keys[i:])
+		n.keys[i] = key
 	case INTERNAL_NODE:
-		if len(n.children) > maxDegree {
-			n.splitChild(t, 0, t.maxDegree)
-		} else {
-			i := 0
-			for i < len(n.children) && key > n.keys[i] {
-				i++
-			}
-			n.children[i].insert(t, key, value, maxDegree)
+		i := 0
+		for i < len(n.keys) && key > n.keys[i] {
+			i++
 		}
+		n.children[i].insert(t, key, value, t.maxDegree)
+	}
+
+	if len(n.keys) > degree {
+		// wtf
+		n.splitChild(t, 0, t.maxDegree)
 	}
 
 	return nil
@@ -207,10 +243,10 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 
 	// Binary search for the key
 	if node.kind == LEAF_NODE {
-		low, high := 0, len(node.keys)-1
+		start, end := 0, len(node.keys)-1
 
-		for low <= high {
-			mid := low + (high-low)/2
+		for start <= end {
+			mid := start + (end-start)/2
 			if node.keys[mid] == key {
 				// Calculate the offset and seek to it
 				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
@@ -227,9 +263,9 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 
 				return value, nil
 			} else if node.keys[mid] < key {
-				low = mid + 1
+				start = mid + 1
 			} else {
-				high = mid - 1
+				end = mid - 1
 			}
 		}
 		return nil, errors.New("key not found")

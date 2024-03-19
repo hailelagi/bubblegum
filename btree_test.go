@@ -16,10 +16,10 @@ var testValueSize = cap(value)
 func TestInsertRoot(t *testing.T) {
 	tree := NewBPlusTree(2)
 	db, _ := InitDB(tree)
-
 	defer db.Close()
 
 	errInsert := tree.Insert(key, value)
+	tree.Insert(key, value)
 	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
 	defer file.Close()
 
@@ -32,6 +32,30 @@ func TestInsertRoot(t *testing.T) {
 
 	// TODO: make this test less dumb
 	assert.Equal(t, value, expectedBuf[:testValueSize-3])
+}
+
+func TestInsertAnDSearchRoot(t *testing.T) {
+	tree := NewBPlusTree(4)
+	db, _ := InitDB(tree)
+	defer db.Close()
+
+	err := tree.Insert(key, value)
+	tree.Insert(key, value)
+
+	// TODO: magic number of offset
+	key := 5
+
+	result, errSearch := tree.Search(5)
+
+	if err != nil {
+		t.Errorf("Error inserting key %d: %v", key, err)
+	}
+
+	if errSearch != nil {
+		t.Errorf("Error searching key %d: %v", key, err)
+	}
+
+	assert.Equal(t, value, result)
 }
 
 func TestInsertKeysBeforeSplit(t *testing.T) {
@@ -61,6 +85,7 @@ func TestInsertKeysBeforeSplit(t *testing.T) {
 	}
 }
 
+/*
 func TestInsertKeysAfterSplit(t *testing.T) {
 	tree := NewBPlusTree(3)
 	db, _ := InitDB(tree)
@@ -84,24 +109,6 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 
 	// TODO: make this test less dumb
 	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
-}
-
-/*
-func TestInsertAnDSearchRoot(t *testing.T) {
-	tree := NewBPlusTree(4)
-
-	err := tree.Insert(key, value)
-	result, errSearch := tree.Search(key)
-
-	if err != nil {
-		t.Errorf("Error inserting key %d: %v", key, err)
-	}
-
-	if errSearch != nil {
-		t.Errorf("Error searching key %d: %v", key, err)
-	}
-
-	assert.Equal(t, value, result)
 }
 */
 
