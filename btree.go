@@ -37,14 +37,13 @@ type BPlusTree struct {
 }
 
 type node struct {
-	kind         nodeType
-	pageId       int64
-	keys         []int
-	next         *node
-	parent       *node
-	leftSibling  *node
-	rightSibling *node
-	children     []*node
+	kind     nodeType
+	pageId   int64
+	keys     []int
+	next     *node
+	previous *node
+	parent   *node
+	children []*node
 }
 
 // NB: terminology
@@ -70,14 +69,13 @@ func NewBPlusTree(maxDegree int) *BPlusTree {
 	// root node is initially empty and triggers no page allocation.
 	return &BPlusTree{
 		root: &node{
-			kind:         ROOT_NODE,
-			keys:         make([]int, MAX_KEY),
-			children:     make([]*node, maxDegree),
-			leftSibling:  nil,
-			rightSibling: nil,
-			next:         nil,
-			parent:       nil,
-			pageId:       0,
+			kind:     ROOT_NODE,
+			keys:     make([]int, MAX_KEY),
+			children: make([]*node, maxDegree),
+			next:     nil,
+			previous: nil,
+			parent:   nil,
+			pageId:   0,
 		},
 		maxDegree: maxDegree,
 	}
@@ -252,7 +250,7 @@ func (node *node) mergeChildren(t *BPlusTree, maxDegree int) error {
 func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
 	// Create a new n to hold the keys and children that will be moved
 	newNode := &node{
-		keys:     make([]int, t.maxDegree),
+		keys:     make([]int, t.maxDegree-1),
 		children: make([]*node, t.maxDegree),
 		kind:     LEAF_NODE,
 		next:     n.next,
