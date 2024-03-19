@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -57,21 +56,17 @@ type node struct {
 // which relates to the branching factor (bound on children)
 // branching factor can be expressed as maxDegree, and is the inequality
 // b - 1 <= num keys < (2 * b) - 1
-
 func NewBPlusTree(maxDegree int) *BPlusTree {
 	// invariant one
 	Assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
 
-	// invariant two: relationship between keys and child pointers
-	// Each node holds up to N keys and N + 1 pointers to the child nodes
-	var MAX_KEY = maxDegree - 1
-
 	// root node is initially empty and triggers no page allocation.
+	// assumes the db file is truncated and the init pageSize is at seek 0
 	return &BPlusTree{
 		root: &node{
 			kind:     ROOT_NODE,
-			keys:     make([]int, MAX_KEY),
-			children: make([]*node, maxDegree),
+			keys:     make([]int, 0),
+			children: make([]*node, 0),
 			next:     nil,
 			previous: nil,
 			parent:   nil,
@@ -85,82 +80,119 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.insert(t, t.db.datafile, key, value, t.maxDegree)
+	n, err := findNode(t.root, key)
+
+	if err == nil {
+		return n.insert(t, key, value, t.maxDegree)
+	} else {
+		return t.root.insert(t, key, value, t.maxDegree)
+	}
 }
 
 func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	return t.root.search(t, t.db.datafile, key)
+	return t.root.search(t, key)
 }
 
 func (t *BPlusTree) Delete(key int) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.delete(t, t.db.datafile, key, t.maxDegree)
+	n, err := findNode(t.root, key)
+
+	if err == nil {
+		return n.delete(t, key, t.maxDegree)
+	} else {
+		return err
+	}
 }
 
-func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, maxDegree int) error {
+// bin search keys, inorder traversal children stack
+func findNode(root *node, key int) (*node, error) {
+	currNode := root
+	stack := root.children
+	low, high := 0, len(currNode.keys)-1
+
+	for low <= high {
+		mid := low + (high-low)/2
+		if root.keys[mid] == key {
+			return root, nil
+			// this boundary condition does not seem correct, it will panic when there's a single key
+			// TODO: deep dive boundary condition to search subtree
+		} else if currNode.keys[mid] > key && currNode.keys[mid+1] < key {
+			if stack == nil {
+				return nil, errors.New("key not found")
+			}
+
+			currNode = stack[len(stack)-1]
+
+			if currNode == nil {
+				return nil, errors.New("key not found")
+			}
+		} else if currNode.keys[mid] > key {
+			high = mid - 1
+		} else {
+			low = mid + 1
+		}
+	}
+
+	return nil, errors.New("key not found")
+}
+
+// invariant two: relationship between keys and child pointers
+// Each node holds up to N keys and N + 1 pointers to the child nodes
+func (n *node) insert(t *BPlusTree, key int, value []byte, maxDegree int) error {
 	switch n.kind {
-	case ROOT_NODE:
-		if len(n.keys) > maxDegree {
+	case ROOT_NODE, LEAF_NODE:
+		if len(n.keys) > maxDegree-1 {
 			n.splitChild(t, len(n.keys)/2, t.maxDegree)
 		} else {
-			offset, err := syncToOffset(file, value)
+			offset, err := syncToOffset(t.db.datafile, value)
 			if err != nil {
 				return err
 			}
+			// TODO: sync offsets with Page{}
 			n.pageId = offset
-
-			// TODO: this key thing
-			// do you map offsets to the id directly?
 			n.keys = append(n.keys, int(offset))
+			slices.Sort(n.keys)
 		}
-	case LEAF_NODE:
-		i := 0
-		for i < len(n.keys) && key > n.keys[i] {
-			i++
+		if len(n.keys) > maxDegree-1 {
+			n.splitChild(t, 0, t.maxDegree)
+		} else {
+			offset, err := syncToOffset(t.db.datafile, value)
+
+			if err != nil {
+				return err
+			}
+
+			n.keys = append(n.keys, int(offset))
+			slices.Sort(n.keys)
 		}
-
-		offset, err := syncToOffset(file, value)
-
-		if err != nil {
-			return err
-		}
-
-		n.keys = append(n.keys, int(offset))
-		slices.Sort(n.keys)
-		copy(n.keys[i+1:], n.keys[i:])
-		n.keys[i] = key
 	case INTERNAL_NODE:
-		i := 0
-		for i < len(n.keys) && key > n.keys[i] {
-			i++
+		if len(n.children) > maxDegree {
+			n.splitChild(t, 0, t.maxDegree)
+		} else {
+			i := 0
+			for i < len(n.children) && key > n.keys[i] {
+				i++
+			}
+			n.children[i].insert(t, key, value, maxDegree)
 		}
-		n.children[i].insert(t, file, key, value, maxDegree)
-	}
-
-	if len(n.keys) > maxDegree {
-		// wtf
-		n.splitChild(t, 0, t.maxDegree)
 	}
 
 	return nil
 }
 
-func (node *node) search(t *BPlusTree, file *os.File, key int) ([]byte, error) {
-	fmt.Println(node.kind)
-	fmt.Println(node.keys)
-	reader := bufio.NewReader(file)
+func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
+	reader := bufio.NewReader(t.db.datafile)
 
 	if node.kind == ROOT_NODE {
 		for _, k := range node.keys {
 			if k == key {
-				fmt.Println("Iam not crazy")
 				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(k))))
-				if _, err := file.Seek(offset, io.SeekStart); err != nil {
+				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
 					return nil, err
 				}
 
@@ -182,7 +214,7 @@ func (node *node) search(t *BPlusTree, file *os.File, key int) ([]byte, error) {
 			if node.keys[mid] == key {
 				// Calculate the offset and seek to it
 				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
-				if _, err := file.Seek(offset, io.SeekStart); err != nil {
+				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
 					return nil, err
 				}
 
@@ -216,7 +248,7 @@ func (node *node) search(t *BPlusTree, file *os.File, key int) ([]byte, error) {
 	return nil, nil
 }
 
-func (node *node) delete(t *BPlusTree, file *os.File, key int, maxDegree int) error {
+func (node *node) delete(t *BPlusTree, key int, maxDegree int) error {
 	// find node using key
 	// pass in node, to node stealSibling
 	// assume node is root at first
@@ -250,8 +282,8 @@ func (node *node) mergeChildren(t *BPlusTree, maxDegree int) error {
 func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
 	// Create a new n to hold the keys and children that will be moved
 	newNode := &node{
-		keys:     make([]int, t.maxDegree-1),
-		children: make([]*node, t.maxDegree),
+		keys:     make([]int, 0),
+		children: make([]*node, 0),
 		kind:     LEAF_NODE,
 		next:     n.next,
 	}
@@ -295,6 +327,7 @@ func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
 
 func syncToOffset(file *os.File, value []byte) (int64, error) {
 	writer := bufio.NewWriter(file)
+	// TODO: sync this to use the new page layout
 	// seek to correct block position using the pageID
 	// make sure we get to disk
 	_, err := writer.Write(value)
