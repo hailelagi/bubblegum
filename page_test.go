@@ -22,7 +22,9 @@ func TestFlushCleanPage(t *testing.T) {
 
 	assert.Equal(t, value, expectedBuf)
 }
+*/
 
+/*
 func TestFlushDirtyPage(t *testing.T) {
 	tree := NewBPlusTree(2)
 	db, _ := InitDB(tree)

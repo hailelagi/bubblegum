@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"testing"
@@ -33,7 +34,6 @@ func TestInsertRoot(t *testing.T) {
 	assert.Equal(t, value, expectedBuf[:testValueSize-3])
 }
 
-/*
 func TestInsertKeysBeforeSplit(t *testing.T) {
 	tree := NewBPlusTree(3)
 	db, _ := InitDB(tree)
@@ -86,6 +86,7 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
 
+/*
 func TestInsertAnDSearchRoot(t *testing.T) {
 	tree := NewBPlusTree(4)
 
@@ -102,6 +103,7 @@ func TestInsertAnDSearchRoot(t *testing.T) {
 
 	assert.Equal(t, value, result)
 }
+*/
 
 /*
 func TestInsertAndAccessBTree(t *testing.T) {
@@ -136,5 +138,4 @@ func TestInsertAndAccessBTree(t *testing.T) {
 	}
 
 }
-
 */

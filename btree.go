@@ -21,9 +21,15 @@ const (
 	LEAF_NODE
 )
 
+// invariant three: relationship between keys and child pointers
+// every node (ie leaf or internal) except the root must have:
+// at least MIN_DEGREE children
+// todo: Assert this in split
+var MIN_DEGREE_NODE int
+
 type BPlusTree struct {
-	root   *node
-	degree int
+	root      *node
+	maxDegree int
 
 	// TODO: idk this use of indirect cyclical pointers feels bad
 	db *DB
@@ -41,26 +47,39 @@ type node struct {
 	children     []*node
 }
 
-func NewBPlusTree(degree int) *BPlusTree {
-	// invariant one: 2 <= no of children < 2 * branching factor
-	// number of keys = no. of children/degree - 1
-	// branching factor - 1 < num keys < 2 * branching factor - 1
-	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
+// NB: terminology
+// Inconsistencies, book pg. 78 "B-Tree Hierarchy"
+// B-Trees are characterized by their fanout: the number of keys stored in each node
+// else where:
+// B+ TREE: FANOUT. Fanout: the number of pointers to child nodes coming out of a node.
+// see: https://pages.cs.wisc.edu/~paris/cs564-s18/lectures/lecture-14.pdf
+
+// degree relates to number of children = maxKeys + 1
+// which relates to the branching factor (bound on children)
+// branching factor can be expressed as maxDegree, and is the inequality
+// b - 1 <= num keys < (2 * b) - 1
+
+func NewBPlusTree(maxDegree int) *BPlusTree {
+	// invariant one
+	Assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
+
+	// invariant two: relationship between keys and child pointers
+	// Each node holds up to N keys and N + 1 pointers to the child nodes
+	var MAX_KEY = maxDegree - 1
 
 	// root node is initially empty and triggers no page allocation.
 	return &BPlusTree{
 		root: &node{
-			kind: ROOT_NODE,
-			// todo: use MAX_KEY and MAX CHILDREN
-			keys:         make([]int, 0),
-			children:     make([]*node, 0),
+			kind:         ROOT_NODE,
+			keys:         make([]int, MAX_KEY),
+			children:     make([]*node, maxDegree),
 			leftSibling:  nil,
 			rightSibling: nil,
 			next:         nil,
 			parent:       nil,
 			pageId:       0,
 		},
-		degree: degree,
+		maxDegree: maxDegree,
 	}
 }
 
@@ -68,7 +87,7 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.insert(t, t.db.datafile, key, value, t.degree)
+	return t.root.insert(t, t.db.datafile, key, value, t.maxDegree)
 }
 
 func (t *BPlusTree) Search(key int) ([]byte, error) {
@@ -82,14 +101,14 @@ func (t *BPlusTree) Delete(key int) error {
 	t.Lock()
 	defer t.Unlock()
 
-	return t.root.delete(t, t.db.datafile, key, t.degree)
+	return t.root.delete(t, t.db.datafile, key, t.maxDegree)
 }
 
-func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, degree int) error {
+func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, maxDegree int) error {
 	switch n.kind {
 	case ROOT_NODE:
-		if len(n.keys) > degree {
-			n.splitChild(t, len(n.keys)/2, t.degree)
+		if len(n.keys) > maxDegree {
+			n.splitChild(t, len(n.keys)/2, t.maxDegree)
 		} else {
 			offset, err := syncToOffset(file, value)
 			if err != nil {
@@ -122,12 +141,12 @@ func (n *node) insert(t *BPlusTree, file *os.File, key int, value []byte, degree
 		for i < len(n.keys) && key > n.keys[i] {
 			i++
 		}
-		n.children[i].insert(t, file, key, value, degree)
+		n.children[i].insert(t, file, key, value, maxDegree)
 	}
 
-	if len(n.keys) > degree {
+	if len(n.keys) > maxDegree {
 		// wtf
-		n.splitChild(t, 0, t.degree)
+		n.splitChild(t, 0, t.maxDegree)
 	}
 
 	return nil
@@ -199,19 +218,19 @@ func (node *node) search(t *BPlusTree, file *os.File, key int) ([]byte, error) {
 	return nil, nil
 }
 
-func (node *node) delete(t *BPlusTree, file *os.File, key int, degree int) error {
+func (node *node) delete(t *BPlusTree, file *os.File, key int, maxDegree int) error {
 	// find node using key
 	// pass in node, to node stealSibling
 	// assume node is root at first
 	// this an optimisation maybe do later
-	ok, err := node.stealSibling(t, degree)
+	ok, err := node.stealSibling(t, maxDegree)
 
 	if err != nil {
 		return err
 	}
 
 	if !ok {
-		err := node.mergeChildren(t, degree)
+		err := node.mergeChildren(t, maxDegree)
 
 		if err != nil {
 			return err
@@ -221,20 +240,20 @@ func (node *node) delete(t *BPlusTree, file *os.File, key int, degree int) error
 	return nil
 }
 
-func (node *node) stealSibling(t *BPlusTree, degree int) (bool, error) {
+func (node *node) stealSibling(t *BPlusTree, maxDegree int) (bool, error) {
 	return false, nil
 }
 
-func (node *node) mergeChildren(t *BPlusTree, degree int) error {
+func (node *node) mergeChildren(t *BPlusTree, maxDegree int) error {
 	return nil
 }
 
 // splitChild splits the child n of the current n at the specified index.
-func (n *node) splitChild(t *BPlusTree, index, degree int) {
+func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
 	// Create a new n to hold the keys and children that will be moved
 	newNode := &node{
-		keys:     make([]int, t.degree),
-		children: make([]*node, t.degree),
+		keys:     make([]int, t.maxDegree),
+		children: make([]*node, t.maxDegree),
 		kind:     LEAF_NODE,
 		next:     n.next,
 	}
@@ -271,8 +290,8 @@ func (n *node) splitChild(t *BPlusTree, index, degree int) {
 	parent.children[index] = newNode
 
 	// Check if the parent n needs splitting
-	if len(parent.keys) > degree {
-		parent.splitChild(t, len(parent.keys)/2, degree)
+	if len(parent.keys) > maxDegree {
+		parent.splitChild(t, len(parent.keys)/2, maxDegree)
 	}
 }
 
