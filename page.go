@@ -54,6 +54,7 @@ func NewPage() (*Page, error) {
 	return &page, nil
 }
 
+// NB: datafile must exist before trying to allocate a page.
 func (p *Page) Allocate() (uint32, error) {
 	file, err := os.OpenFile("db", os.O_RDWR|os.O_APPEND, 0644)
 	offset, errSeek := file.Seek(0, io.SeekEnd)
@@ -71,7 +72,7 @@ func (p *Page) Allocate() (uint32, error) {
 	return endOffset, nil
 }
 
-func (p *Page) Flush(file *os.File, startOffSet int64) error {
+func (p *Page) Flush(db *DB) error {
 	// Encode the page into bytes
 	buf := new(bytes.Buffer)
 
@@ -84,8 +85,8 @@ func (p *Page) Flush(file *os.File, startOffSet int64) error {
 
 	// Write the page bytes to the file at the calculated offsets
 	// TODO(nice-to-have): checksum pages using md5
-	n, err := file.WriteAt(pageBytes, int64(p.offsetBegin))
-	syncErr := file.Sync()
+	n, err := db.datafile.WriteAt(pageBytes, int64(p.offsetBegin))
+	syncErr := db.datafile.Sync()
 
 	if err != nil {
 		return err

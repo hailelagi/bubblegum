@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
 	"strconv"
@@ -47,12 +46,8 @@ func NewBPlusTree(degree int) *BPlusTree {
 	// number of keys = no. of children/degree - 1
 	// branching factor - 1 < num keys < 2 * branching factor - 1
 	Assert(degree >= 2, "the minimum degree of a B+ tree must be greater than 2")
-	rootPage, err := NewPage()
 
-	if err != nil {
-		log.Fatal("root node pre-allocation failure")
-	}
-
+	// root node is initially empty and triggers no page allocation.
 	return &BPlusTree{
 		root: &node{
 			kind: ROOT_NODE,
@@ -63,7 +58,7 @@ func NewBPlusTree(degree int) *BPlusTree {
 			rightSibling: nil,
 			next:         nil,
 			parent:       nil,
-			pageId:       rootPage.id,
+			pageId:       0,
 		},
 		degree: degree,
 	}

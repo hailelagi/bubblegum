@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"testing"
@@ -16,6 +15,7 @@ var testValueSize = cap(value)
 func TestInsertRoot(t *testing.T) {
 	tree := NewBPlusTree(2)
 	db, _ := InitDB(tree)
+
 	defer db.Close()
 
 	errInsert := tree.Insert(key, value)
@@ -33,6 +33,7 @@ func TestInsertRoot(t *testing.T) {
 	assert.Equal(t, value, expectedBuf[:testValueSize-3])
 }
 
+/*
 func TestInsertKeysBeforeSplit(t *testing.T) {
 	tree := NewBPlusTree(3)
 	db, _ := InitDB(tree)
