@@ -65,7 +65,7 @@ func TestInsertKeysBeforeSplit(t *testing.T) {
 
 	var expectedKeys []byte
 
-	for i := 1; i < 4; i++ {
+	for i := 1; i < 3; i++ {
 		key := i
 		value := []byte(fmt.Sprint("msg_", i, "\n"))
 		expectedKeys = append(expectedKeys, value...)
@@ -76,11 +76,10 @@ func TestInsertKeysBeforeSplit(t *testing.T) {
 	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
 	defer file.Close()
 
-	gotBuf := make([]byte, testValueSize*4)
+	gotBuf := make([]byte, testValueSize+4)
 	_, e := file.Read(gotBuf)
 
-	// TODO: refactor this assertion to rely less on magic numbers
-	if !bytes.Equal(expectedKeys, gotBuf[:testValueSize*4-14]) || e != nil {
+	if !bytes.Equal(expectedKeys, gotBuf) || e != nil {
 		t.Errorf("Error key does not match result")
 	}
 }

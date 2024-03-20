@@ -46,13 +46,6 @@ type node struct {
 	children []*node
 }
 
-// NB: terminology
-// Inconsistencies, book pg. 78 "B-Tree Hierarchy"
-// B-Trees are characterized by their fanout: the number of keys stored in each node
-// else where:
-// B+ TREE: FANOUT. Fanout: the number of pointers to child nodes coming out of a node.
-// see: https://pages.cs.wisc.edu/~paris/cs564-s18/lectures/lecture-14.pdf
-
 // degree relates to number of children = maxKeys + 1
 // which relates to the branching factor (bound on children)
 // branching factor can be expressed as maxDegree, and is the inequality
@@ -77,23 +70,30 @@ func NewBPlusTree(maxDegree int) *BPlusTree {
 	}
 }
 
+// Insert inserts a key/value pair into the B-tree
 func (t *BPlusTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	// _, err := findNode(t.root, key)
+	_, err := findNode(t.root, key)
 
-	/*
-		if err == nil {
-			return t.root.insert(t, key, value, t.maxDegree)
-		} else {
-			return errors.New("key already exists")
-		}
-	*/
-
-	return t.root.insert(t, key, value, t.maxDegree)
+	if err == nil {
+		return errors.New("attempted to insert duplicate key")
+	} else {
+		return t.root.insert(t, key, value, t.maxDegree)
+	}
 }
 
+// Scan traverses all the nodes in a B-tree in linear time.
+// it starts off at the left most pointer and recursively does
+// an inorder traversal to all the nodes.
+// may not implement
+func (t *BPlusTree) Scan() ([][]byte, error) {
+	return nil, errors.New("unimplemented")
+}
+
+// Search starts from the root and traverses all internal nodes until it finds
+// the leaf node containing key, accesses its page and returns the byte arrary with the key/value.
 func (t *BPlusTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
@@ -127,10 +127,11 @@ func (t *BPlusTree) Delete(key int) error {
 	}
 }
 
-// for now the assumption is the key == offset
+// TODO: for now the assumption is the key == offset, this is not true.
+// findNode searches from the root and traverses all internal nodes until it finds
+// the leaf node containing key or in the case of a single node root, the root.
 func findNode(root *node, key int) (*node, error) {
 	currNode := root
-	stack := root.children
 
 	if len(currNode.keys) == 0 {
 		return nil, errors.New("key not found")
@@ -162,7 +163,7 @@ func findNode(root *node, key int) (*node, error) {
 
 	search := start + (end-start)/2
 
-	if stack == nil || currNode.kind == LEAF_NODE {
+	if len(currNode.children) == 0 || currNode.kind == LEAF_NODE {
 		return nil, errors.New("key not found")
 	} else {
 		// validate relationship btwn num keys and searchIndex
@@ -213,11 +214,6 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 		n.children[i].insert(t, key, value, t.maxDegree)
 	}
 
-	if len(n.keys) > degree {
-		// wtf
-		n.splitChild(t, 0, t.maxDegree)
-	}
-
 	return nil
 }
 
@@ -242,7 +238,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	}
 
 	// Binary search for the key
-	if node.kind == LEAF_NODE {
+	if node.kind == LEAF_NODE || node.kind == INTERNAL_NODE {
 		start, end := 0, len(node.keys)-1
 
 		for start <= end {
@@ -271,17 +267,13 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 		return nil, errors.New("key not found")
 	}
 
-	/*
-		// If the node is not a leaf node, recursively search in the appropriate child
-		i := 0
-		for i < len(node.keys) && key >= node.keys[i] {
-			i++
-		}
+	// If the node is not a leaf node, recursively search in the appropriate child
+	i := 0
+	for i < len(node.keys) && key >= node.keys[i] {
+		i++
+	}
 
-		return node.children[i].search(t, key) // Recursively search in child node
-	*/
-
-	return nil, nil
+	return node.children[i].search(t, key) // Recursively search in child node
 }
 
 func (node *node) delete(t *BPlusTree, key int, maxDegree int) error {
