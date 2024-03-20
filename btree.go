@@ -316,6 +316,7 @@ func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
 		next:     n.next,
 	}
 
+	// TODO: this is.. not correct.
 	// Move keys and children to the new n
 	copy(newNode.keys, n.keys[index:])
 	copy(newNode.children, n.children[index:])

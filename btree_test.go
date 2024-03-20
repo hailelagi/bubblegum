@@ -84,7 +84,6 @@ func TestInsertKeysBeforeSplit(t *testing.T) {
 	}
 }
 
-/*
 func TestInsertKeysAfterSplit(t *testing.T) {
 	tree := NewBPlusTree(3)
 	db, _ := InitDB(tree)
@@ -109,7 +108,6 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	// TODO: make this test less dumb
 	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
-*/
 
 /*
 func TestInsertAndAccessBTree(t *testing.T) {
