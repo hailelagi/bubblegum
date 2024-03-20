@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"io"
 	"log"
 	"os"
@@ -17,6 +16,10 @@ const (
 	// 500 bytes per message/key's value else overflow
 	MAX_NODE_VALUE_SIZE = 500
 )
+
+/*
+todo: track empty page size/occupancy
+*/
 
 // a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
 type Page struct {
@@ -43,9 +46,9 @@ type cell struct {
 	dataRecord []byte
 }
 
-func NewPage() (*Page, error) {
+func NewPage(datafile *os.File) (*Page, error) {
 	page := Page{}
-	_, err := page.Allocate()
+	err := page.Allocate(datafile)
 
 	if err != nil {
 		return nil, err
@@ -54,28 +57,44 @@ func NewPage() (*Page, error) {
 	return &page, nil
 }
 
-// NB: datafile must exist before trying to allocate a page.
-func (p *Page) Allocate() (uint32, error) {
-	file, err := os.OpenFile("db", os.O_RDWR|os.O_APPEND, 0644)
-	offset, errSeek := file.Seek(0, io.SeekEnd)
-
-	if err != nil || errSeek != nil {
-		return 0, errors.New("internal error: could not allocate a new page")
-	}
-	defer file.Close()
-
-	// NB: this does not actually write [yet]
-	// todo: lift the pageId autoincrement globally to the DB struct
-	startOffset := uint32(offset)
-	endOffset := startOffset + PAGE_SIZE
-
-	return endOffset, nil
+/*
+DBMS uses an indirection layer to map pageIDs to offsets.
+page directory? - maps page ids to offsets
+*/
+func (p *Page) MapToOffset() (int64, error) {
+	return 0, nil
 }
 
+func (p *Page) Allocate(datafile *os.File) error {
+	// todo: lift the pageId autoincrement globally to the DB struct
+	// todo: create the page directory mechanism
+	p.offsetEnd = p.id * PAGE_SIZE
+	p.offsetBegin = p.offsetEnd - PAGE_SIZE
+
+	// todo: preallocate cells with make()
+
+	/*
+			if err != nil {
+			return errors.New("internal error: could not allocate a new page")
+		}
+
+	*/
+
+	return nil
+}
+
+// Fetch: retrieve an existing page from the buffer pool or pull from disk
+// and decode the contents back into a memory page
+func Fetch(pageId int) error {
+	return nil
+}
+
+// Flush: flush dirty pages and encode into raw bytes to disk
 func (p *Page) Flush(db *DB) error {
 	// Encode the page into bytes
 	buf := new(bytes.Buffer)
 
+	_, err := db.datafile.Seek(p.offsetBegin, io.SeekStart)
 	// todo(FIXME): come back when init'd fixed size cells
 	// p = NewPage with alloc'd cells
 	if err := binary.Write(buf, binary.LittleEndian, p); err != nil {

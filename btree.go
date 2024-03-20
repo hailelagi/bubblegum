@@ -86,7 +86,7 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 
 // Scan traverses all the nodes in a B-tree in linear time.
 // it starts off at the left most pointer and recursively does
-// an inorder traversal to all the nodes.
+// an inorder traversal to all leaf nodes.
 // may not implement
 func (t *BPlusTree) Scan() ([][]byte, error) {
 	return nil, errors.New("unimplemented")
