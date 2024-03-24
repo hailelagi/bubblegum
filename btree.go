@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strconv"
 	"sync"
 )
@@ -16,7 +14,7 @@ type nodeType int
 
 // oh go, where art thy sum types? thine enums forsake me :(
 const (
-	ROOT_NODE nodeType = iota
+	ROOT_NODE nodeType = iota + 1
 	INTERNAL_NODE
 	LEAF_NODE
 )
@@ -24,7 +22,7 @@ const (
 // invariant three: relationship between keys and child pointers
 // every node (ie leaf or internal) except the root must have:
 // at least MIN_DEGREE children
-// todo: Assert this in split
+// todo: Assert this in split/merge
 var MIN_DEGREE_NODE int
 
 type BPlusTree struct {
@@ -150,8 +148,6 @@ func findNode(root *node, key int) (*node, error) {
 	for start <= end {
 		mid := start + (end-start)/2
 
-		fmt.Println(mid)
-
 		if currNode.keys[mid] == key {
 			return currNode, nil
 		} else if currNode.keys[mid] > key {
@@ -177,7 +173,7 @@ func findNode(root *node, key int) (*node, error) {
 func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	switch n.kind {
 	case ROOT_NODE:
-		if len(n.keys) > degree {
+		if len(n.keys) > degree-1 {
 			n.splitChild(t, len(n.keys)/2, t.maxDegree)
 		} else {
 			offset, err := syncToOffset(t.db.datafile, value)
@@ -203,7 +199,7 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 		}
 
 		n.keys = append(n.keys, int(offset))
-		slices.Sort(n.keys)
+
 		copy(n.keys[i+1:], n.keys[i:])
 		n.keys[i] = key
 	case INTERNAL_NODE:
