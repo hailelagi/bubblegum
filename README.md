@@ -1,4 +1,4 @@
-# btree
+# bubblegum 🍬
 
 An On-Disk B+ Tree storage engine built as a part of reading [Database Internals](https://www.databass.dev/).
 
