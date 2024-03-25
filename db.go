@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"syscall"
 )
 
 type DB struct {
@@ -15,15 +16,16 @@ type DB struct {
 // or use a memory pool if pages aren't structured in a single file see for e.g Postgres.
 // "real" persistent B+ trees would use the open/read/write/seek syscalls more sophisticatedly.
 // see also alernatively: https://www.sqlite.org/mmap.html
+
 func InitDB(store *BPlusTree) (*DB, error) {
 	// init the datafile
-	file, err := os.Create("db")
+	file, err := syscall.Open("db", syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 
 	if err != nil {
 		return nil, err
 	}
 
-	db := &DB{datafile: file, store: store}
+	db := &DB{datafile: os.NewFile(uintptr(file), "db"), store: store}
 	db.store.db = db
 
 	return db, nil
