@@ -14,7 +14,7 @@ NB:
 // FILE FORMAT
 // todo!
 
-visualisation: https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
+visualisation: https://www.cs.usfca.edu/~galles/visualization/BTree.html
 
 // learn more:
 // etcd: https://pkg.go.dev/github.com/google/btree
@@ -31,7 +31,7 @@ import (
 )
 
 func main() {
-	db, err := InitDB(NewBPlusTree(100))
+	db, err := InitDB(NewBTree(100))
 
 	if err != nil {
 		log.Fatalf("could not init database cause: %v", err)

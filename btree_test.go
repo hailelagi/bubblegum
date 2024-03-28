@@ -14,7 +14,7 @@ var value = []byte(fmt.Sprint("msg_", key))
 var testValueSize = cap(value)
 
 func TestInsertRoot(t *testing.T) {
-	tree := NewBPlusTree(2)
+	tree := NewBTree(2)
 	db, _ := InitDB(tree)
 	defer db.Close()
 
@@ -35,7 +35,7 @@ func TestInsertRoot(t *testing.T) {
 }
 
 func TestInsertAnDSearchRoot(t *testing.T) {
-	tree := NewBPlusTree(4)
+	tree := NewBTree(4)
 	db, _ := InitDB(tree)
 	defer db.Close()
 
@@ -59,7 +59,7 @@ func TestInsertAnDSearchRoot(t *testing.T) {
 }
 
 func TestInsertKeysBeforeSplit(t *testing.T) {
-	tree := NewBPlusTree(3)
+	tree := NewBTree(3)
 	db, _ := InitDB(tree)
 	defer db.Close()
 
@@ -85,7 +85,7 @@ func TestInsertKeysBeforeSplit(t *testing.T) {
 }
 
 func TestInsertKeysAfterSplit(t *testing.T) {
-	tree := NewBPlusTree(3)
+	tree := NewBTree(3)
 	db, _ := InitDB(tree)
 	defer db.Close()
 
@@ -111,7 +111,7 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 
 /*
 func TestInsertAndAccessBTree(t *testing.T) {
-	tree := NewBPlusTree(4)
+	tree := NewBTree(4)
 
 	for i := 0; i < 3; i++ {
 		key := i

@@ -1,4 +1,4 @@
-module github.com/hailelagi/btree
+module github.com/hailelagi/bubblegum
 
 go 1.21.6
 

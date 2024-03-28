@@ -25,7 +25,7 @@ const (
 // todo: Assert this in split/merge
 var MIN_DEGREE_NODE int
 
-type BPlusTree struct {
+type BTree struct {
 	root      *node
 	maxDegree int
 
@@ -48,13 +48,13 @@ type node struct {
 // which relates to the branching factor (bound on children)
 // branching factor can be expressed as maxDegree, and is the inequality
 // b - 1 <= num keys < (2 * b) - 1
-func NewBPlusTree(maxDegree int) *BPlusTree {
+func NewBTree(maxDegree int) *BTree {
 	// invariant one
 	Assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
 
 	// root node is initially empty and triggers no page allocation.
 	// assumes the db file is truncated and the init pageSize is at seek 0
-	return &BPlusTree{
+	return &BTree{
 		root: &node{
 			kind:     ROOT_NODE,
 			keys:     make([]int, 0),
@@ -69,7 +69,7 @@ func NewBPlusTree(maxDegree int) *BPlusTree {
 }
 
 // Insert inserts a key/value pair into the B-tree
-func (t *BPlusTree) Insert(key int, value []byte) error {
+func (t *BTree) Insert(key int, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -86,13 +86,13 @@ func (t *BPlusTree) Insert(key int, value []byte) error {
 // it starts off at the left most pointer and recursively does
 // an inorder traversal to all leaf nodes.
 // may not implement
-func (t *BPlusTree) Scan() ([][]byte, error) {
+func (t *BTree) Scan() ([][]byte, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Search starts from the root and traverses all internal nodes until it finds
 // the leaf node containing key, accesses its page and returns the byte arrary with the key/value.
-func (t *BPlusTree) Search(key int) ([]byte, error) {
+func (t *BTree) Search(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -112,7 +112,7 @@ func (t *BPlusTree) Search(key int) ([]byte, error) {
 
 }
 
-func (t *BPlusTree) Delete(key int) error {
+func (t *BTree) Delete(key int) error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -170,7 +170,7 @@ func findNode(root *node, key int) (*node, error) {
 
 // invariant two: relationship between keys and child pointers
 // Each node holds up to N keys and N + 1 pointers to the child nodes
-func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
+func (n *node) insert(t *BTree, key int, value []byte, degree int) error {
 	switch n.kind {
 	case ROOT_NODE:
 		if len(n.keys) > degree-1 {
@@ -213,7 +213,7 @@ func (n *node) insert(t *BPlusTree, key int, value []byte, degree int) error {
 	return nil
 }
 
-func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
+func (node *node) search(t *BTree, key int) ([]byte, error) {
 	reader := bufio.NewReader(t.db.datafile)
 
 	if node.kind == ROOT_NODE {
@@ -272,7 +272,7 @@ func (node *node) search(t *BPlusTree, key int) ([]byte, error) {
 	return node.children[i].search(t, key) // Recursively search in child node
 }
 
-func (node *node) delete(t *BPlusTree, key int, maxDegree int) error {
+func (node *node) delete(t *BTree, key int, maxDegree int) error {
 	// find node using key
 	// pass in node, to node stealSibling
 	// assume node is root at first
@@ -294,16 +294,16 @@ func (node *node) delete(t *BPlusTree, key int, maxDegree int) error {
 	return nil
 }
 
-func (node *node) stealSibling(t *BPlusTree, maxDegree int) (bool, error) {
+func (node *node) stealSibling(t *BTree, maxDegree int) (bool, error) {
 	return false, nil
 }
 
-func (node *node) mergeChildren(t *BPlusTree, maxDegree int) error {
+func (node *node) mergeChildren(t *BTree, maxDegree int) error {
 	return nil
 }
 
 // splitChild splits the child n of the current n at the specified index.
-func (n *node) splitChild(t *BPlusTree, index, maxDegree int) {
+func (n *node) splitChild(t *BTree, index, maxDegree int) {
 	// Create a new n to hold the keys and children that will be moved
 	newNode := &node{
 		keys:     make([]int, 0),

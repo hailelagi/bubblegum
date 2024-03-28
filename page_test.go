@@ -2,7 +2,7 @@ package main
 
 /*
 func TestFlushCleanPage(t *testing.T) {
-	tree := NewBPlusTree(2)
+	tree := NewBTree(2)
 	db, _ := InitDB(tree)
 	defer db.Close()
 
@@ -26,7 +26,7 @@ func TestFlushCleanPage(t *testing.T) {
 
 /*
 func TestFlushDirtyPage(t *testing.T) {
-	tree := NewBPlusTree(2)
+	tree := NewBTree(2)
 	db, _ := InitDB(tree)
 	defer db.Close()
 

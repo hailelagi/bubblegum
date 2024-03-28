@@ -7,7 +7,8 @@ import (
 
 type DB struct {
 	datafile *os.File
-	store    *BPlusTree
+	// todo: generic initializer btree/lsm
+	store *BTree
 }
 
 // if we have to open and close a file handle on each call that's bad..
@@ -17,7 +18,7 @@ type DB struct {
 // "real" persistent B+ trees would use the open/read/write/seek syscalls more sophisticatedly.
 // see also alernatively: https://www.sqlite.org/mmap.html
 
-func InitDB(store *BPlusTree) (*DB, error) {
+func InitDB(store *BTree) (*DB, error) {
 	// init the datafile
 	file, err := syscall.Open("db", syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 
