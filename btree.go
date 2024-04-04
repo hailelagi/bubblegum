@@ -29,8 +29,6 @@ type BTree struct {
 	root      *node
 	maxDegree int
 
-	// TODO: idk this use of indirect cyclical pointers feels bad
-	db *DB
 	sync.RWMutex
 }
 
@@ -90,9 +88,13 @@ func (t *BTree) Scan() ([][]byte, error) {
 	return nil, errors.New("unimplemented")
 }
 
+func (t *BTree) Range(start, end int) ([][]byte, error) {
+	return nil, nil
+}
+
 // Search starts from the root and traverses all internal nodes until it finds
 // the leaf node containing key, accesses its page and returns the byte arrary with the key/value.
-func (t *BTree) Search(key int) ([]byte, error) {
+func (t *BTree) Get(key int) ([]byte, error) {
 	t.RLock()
 	defer t.RUnlock()
 

@@ -16,6 +16,7 @@ var testValueSize = cap(value)
 func TestInsertRoot(t *testing.T) {
 	tree := NewBTree(2)
 	db, _ := InitDB(tree)
+
 	defer db.Close()
 
 	errInsert := tree.Insert(key, value)
@@ -45,7 +46,7 @@ func TestInsertAnDSearchRoot(t *testing.T) {
 	// TODO: magic number of offset
 	key := 5
 
-	result, errSearch := tree.Search(5)
+	result, errSearch := tree.Get(5)
 
 	if err != nil {
 		t.Errorf("Error inserting key %d: %v", key, err)

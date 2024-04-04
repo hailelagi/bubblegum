@@ -90,11 +90,11 @@ func Fetch(pageId int) error {
 }
 
 // Flush: flush dirty pages and encode into raw bytes to disk
-func (p *Page) Flush(db *DB) error {
+func (p *Page) Flush(datafile *os.File) error {
 	// Encode the page into bytes
 	buf := new(bytes.Buffer)
 
-	_, err := db.datafile.Seek(p.offsetBegin, io.SeekStart)
+	_, err := datafile.Seek(p.offsetBegin, io.SeekStart)
 	// todo(FIXME): come back when init'd fixed size cells
 	// p = NewPage with alloc'd cells
 	if err := binary.Write(buf, binary.LittleEndian, p); err != nil {
@@ -104,8 +104,8 @@ func (p *Page) Flush(db *DB) error {
 
 	// Write the page bytes to the file at the calculated offsets
 	// TODO(nice-to-have): checksum pages using md5
-	n, err := db.datafile.WriteAt(pageBytes, int64(p.offsetBegin))
-	syncErr := db.datafile.Sync()
+	n, err := datafile.WriteAt(pageBytes, int64(p.offsetBegin))
+	syncErr := datafile.Sync()
 
 	if err != nil {
 		return err

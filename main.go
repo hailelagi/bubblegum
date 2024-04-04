@@ -44,7 +44,7 @@ func main() {
 	}
 
 	for i := 1; i < 10_000; i++ {
-		res, _ := db.Query(i)
+		res, _ := db.Get(i)
 		value := []byte(fmt.Sprint("msg_", i, "\n"))
 		Assert(bytes.Equal(res, value), "read your writes :) ")
 	}
