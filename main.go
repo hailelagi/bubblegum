@@ -31,7 +31,8 @@ import (
 )
 
 func main() {
-	db, err := InitDB(NewBTree(100))
+	tree := NewBTree(100)
+	db, err := InitDB(tree)
 
 	if err != nil {
 		log.Fatalf("could not init database cause: %v", err)

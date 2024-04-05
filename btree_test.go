@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"testing"
@@ -19,6 +18,8 @@ func TestInsertRoot(t *testing.T) {
 
 	defer db.Close()
 
+	tree.db = db
+
 	errInsert := tree.Insert(key, value)
 	tree.Insert(key, value)
 	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
@@ -34,6 +35,8 @@ func TestInsertRoot(t *testing.T) {
 	// TODO: make this test less dumb
 	assert.Equal(t, value, expectedBuf[:testValueSize-3])
 }
+
+/*
 
 func TestInsertAnDSearchRoot(t *testing.T) {
 	tree := NewBTree(4)

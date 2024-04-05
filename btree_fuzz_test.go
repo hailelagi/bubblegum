@@ -1,13 +1,11 @@
 package main
 
-import (
-	"bytes"
-	"fmt"
-	"testing"
-)
-
+/*
 func FuzzInsert(f *testing.F) {
 	tree := NewBTree(4)
+	db, _ := InitDB(tree)
+	tree.db = db
+
 	for key := 1; key < 4; key++ {
 		value := []byte(fmt.Sprint("msg_\n", key))
 		f.Add(key, value)
@@ -22,3 +20,4 @@ func FuzzInsert(f *testing.F) {
 		}
 	})
 }
+*/

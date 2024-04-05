@@ -29,6 +29,7 @@ type BTree struct {
 	root      *node
 	maxDegree int
 
+	db *DB
 	sync.RWMutex
 }
 
