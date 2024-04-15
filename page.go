@@ -21,15 +21,19 @@ const (
 todo: track empty page size/occupancy
 */
 
-// a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
-type Page struct {
-	// the page ID
+type header struct {
+	// page id
 	id int64
 	// the physical offset mapping to the begining
 	// and end of an allocated virtual memory segment block on the datafile "db"
 	offsetBegin int64
 	offsetEnd   int64
-	cells       []cell
+}
+
+// a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
+type Page struct {
+	header header
+	cells  []cell
 }
 
 // cell's hold individual key/value records

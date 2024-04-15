@@ -37,7 +37,7 @@ func InitDB(store Store) (*DB, error) {
 
 	file, err := syscall.Open("db", syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
 	return &DB{datafile: os.NewFile(uintptr(file), "db"), store: store}, nil
@@ -58,6 +58,7 @@ func (db *DB) Get(key int) ([]byte, error) {
 
 	return nil, nil
 }
+
 func (db *DB) Delete(key int) error {
 	// todo stub out key for Interface{} or parameterise this
 	// todo handle high level datatypes, int & str

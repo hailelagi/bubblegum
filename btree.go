@@ -222,7 +222,7 @@ func (node *node) search(t *BTree, key int) ([]byte, error) {
 	if node.kind == ROOT_NODE {
 		for _, k := range node.keys {
 			if k == key {
-				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(k))))
+				offset := int64(binary.LittleEndian.Uint64([]byte(strconv.Itoa(k))))
 				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
 					return nil, err
 				}
@@ -244,7 +244,7 @@ func (node *node) search(t *BTree, key int) ([]byte, error) {
 			mid := start + (end-start)/2
 			if node.keys[mid] == key {
 				// Calculate the offset and seek to it
-				offset := int64(binary.BigEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
+				offset := int64(binary.LittleEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
 				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
 					return nil, err
 				}
