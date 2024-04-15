@@ -11,35 +11,39 @@ import (
 const (
 	// 4KiB
 	PAGE_SIZE = 4096
-	// cap key sizes to fit into 8bytes for now
-	MAX_NODE_KEY_SIZE = 8
-	// 500 bytes per message/key's value else overflow
-	MAX_NODE_VALUE_SIZE = 500
+
+	// 4096
+	// 512 bytes per cell value else overflow
+	OVERFLOW_PAGE_SIZE = 512
 )
 
-/*
-todo: track empty page size/occupancy
-*/
+// the physical offset mapping to the begining
+// and end of an allocated virtual memory segment block on the datafile "db"
+// pLower int32
+// pHigh  int32
+// first two bits of the header
 
-type header struct {
-	// page id
-	id int64
-	// the physical offset mapping to the begining
-	// and end of an allocated virtual memory segment block on the datafile "db"
-	offsetBegin int64
-	offsetEnd   int64
-}
+// 8 byte header
+type header [8]uint8
 
-// a contigous 4kiB chunk of memory maintained in-memory ie the "buffer pool"
+// Page is (de)serialised disk block similar to: https://doxygen.postgresql.org/bufpage_8h_source.html
+// It is a contigous 4kiB chunk of memory maintained in-memory(on init) + a disk repr.
+// It is both a logical and physical representation of data.
+// logically a page is organised in 'slots':
+// [[header] [pointers/offsets to cells] [[cell][cell][cell]]]
 type Page struct {
 	header header
 	cells  []cell
 }
 
+// Key cells hold a separator key and a pointer to the page between two neighboring pointers
+// Key-value cells hold keys and data records associated with them.
+
 // cell's hold individual key/value records
 // cell's are either:
 // a key cell - holds only seperator keys and pointers to pages between neighbours
 // a key/value cell - holds keys and data records ie isKeyCell = false
+
 type cell struct {
 	pageId    int64
 	isKeyCell bool

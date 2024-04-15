@@ -36,7 +36,7 @@ type BTree struct {
 type node struct {
 	kind     nodeType
 	pageId   int64
-	keys     []int
+	keys     []int64
 	next     *node
 	previous *node
 	parent   *node
