@@ -20,7 +20,7 @@ func TestFlushCleanPage(t *testing.T) {
 	expectedBuf := make([]byte, testValueSize)
 	file.Read(expectedBuf)
 
-	assert.Equal(t, value, expectedBuf)
+	_assert.Equal(t, value, expectedBuf)
 }
 */
 
@@ -44,7 +44,7 @@ func TestFlushDirtyPage(t *testing.T) {
 	expectedBuf := make([]byte, testValueSize)
 	file.Read(expectedBuf)
 
-	assert.Equal(t, value, expectedBuf)
+	_assert.Equal(t, value, expectedBuf)
 }
 
 */

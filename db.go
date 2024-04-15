@@ -6,6 +6,7 @@ import (
 	"syscall"
 )
 
+// The storage engine high level api
 type Store interface {
 	Get(key int) ([]byte, error)
 	Insert(key int, value []byte) error
@@ -35,6 +36,7 @@ func InitDB(store Store) (*DB, error) {
 
 	defer init.Close()
 
+	// todo: preallocate header segment
 	file, err := syscall.Open("db", syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -43,13 +45,13 @@ func InitDB(store Store) (*DB, error) {
 	return &DB{datafile: os.NewFile(uintptr(file), "db"), store: store}, nil
 }
 
+/*** Access Methods ***/
+
 func (db *DB) Insert(key int, value []byte) error {
 	return db.store.Insert(key, value)
 }
 
 func (db *DB) Get(key int) ([]byte, error) {
-	// todo stub out key for Interface{} or parameterise this
-	// todo handle high level datatypes, int & str
 	s := db.store
 
 	if s != nil {

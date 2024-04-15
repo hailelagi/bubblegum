@@ -7,10 +7,32 @@ An On-Disk B+ Tree storage engine built as a part of reading [Database Internals
 Persistence is achieved using a simple/naive buffer pool ontop of the `read`, `write`, `lseek` syscalls and pages are flushed with `fsync`.
 Concurrency control is achieved using a single global blocking RWMutex lock(for now!).
 
-## File Format
-TODO:
-| x | y | z |
-| ... | ... |
+## DataFile Format/Bit Representation
+
+Slotted Pages:
+```
+| header |   Page(s)    | trailer |
+| ...    | .. | .. | .. |  ...    |
+```
+
+header:
+```
+| header |
+| ...    |
+```
+
+page:
+```
+| page  |
+|header(field names) | cell |
+```
+
+
+trailer:
+```
+| trailer|
+| \n     |
+```
 
 ```bash
 $ go get

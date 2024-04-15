@@ -59,7 +59,7 @@ func TestInsertAnDSearchRoot(t *testing.T) {
 		t.Errorf("Error searching key %d: %v", key, err)
 	}
 
-	assert.Equal(t, value, result)
+	_assert.Equal(t, value, result)
 }
 
 func TestInsertKeysBeforeSplit(t *testing.T) {
@@ -110,7 +110,7 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	file.Read(gotBuf)
 
 	// TODO: make this test less dumb
-	assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
+	_assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
 
 /*

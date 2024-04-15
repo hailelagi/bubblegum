@@ -22,7 +22,7 @@ const (
 // invariant three: relationship between keys and child pointers
 // every node (ie leaf or internal) except the root must have:
 // at least MIN_DEGREE children
-// todo: Assert this in split/merge
+// todo: _assert this in split/merge
 var MIN_DEGREE_NODE int
 
 type BTree struct {
@@ -49,7 +49,7 @@ type node struct {
 // b - 1 <= num keys < (2 * b) - 1
 func NewBTree(maxDegree int) *BTree {
 	// invariant one
-	Assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
+	_assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
 
 	// root node is initially empty and triggers no page allocation.
 	// assumes the db file is truncated and the init pageSize is at seek 0

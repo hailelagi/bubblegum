@@ -1,18 +1,12 @@
 package main
 
 /*
-A 'simple' Persistent/On-Disk B Plus Tree.
-node keys are assumed to be signed integers and values a slice of bytes.
-Persistence is achieved using a naive IO buffer managed by the OS for simplicity.
-Concurrency control is achieved using a single global blocking RWMutex lock.
+A toy Persistent/On-Disk B Plus Tree.
 
 NB:
 // B-Tree implementations have many implementation specific details and optimisations before
-// they're 'production' ready, notably they may use a free-list to hold cells in the leaf nodes,
-// employ CoW semantics and support sophisticated concurrency mechanisms.
-
-// FILE FORMAT
-// todo!
+// they're 'production' ready, notably they may use a free-list to hold cells in the leaf nodes(in-memory),
+// employ CoW semantics and support sophisticated concurrency mechanisms(MVCC).
 
 visualisation: https://www.cs.usfca.edu/~galles/visualization/BTree.html
 
@@ -47,14 +41,14 @@ func main() {
 	for i := 1; i < 10_000; i++ {
 		res, _ := db.Get(i)
 		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		Assert(bytes.Equal(res, value), "read your writes :) ")
+		_assert(bytes.Equal(res, value), "read your writes :) ")
 	}
 
 	for i := 1; i < 10_000; i++ {
 		db.Delete(i)
 		err := db.Delete(i)
 
-		Assert(err != nil, "value must not be found after deletion")
+		_assert(err != nil, "value must not be found after deletion")
 	}
 
 	// cleanup
@@ -62,7 +56,7 @@ func main() {
 }
 
 // why? see: https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety
-func Assert(cond bool, errMsg string, v ...any) {
+func _assert(cond bool, errMsg string, v ...any) {
 	if !cond {
 		panic(fmt.Sprintf("runtime invariant failure: "+errMsg, v...))
 	}
