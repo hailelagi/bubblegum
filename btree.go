@@ -36,7 +36,7 @@ type BTree struct {
 type node struct {
 	kind     nodeType
 	pageId   int64
-	keys     []int64
+	keys     []int
 	next     *node
 	previous *node
 	parent   *node
@@ -56,8 +56,8 @@ func NewBTree(maxDegree int) *BTree {
 	return &BTree{
 		root: &node{
 			kind:     ROOT_NODE,
-			keys:     make([]int, 0),
-			children: make([]*node, 0),
+			keys:     []int{},
+			children: []*node{},
 			next:     nil,
 			previous: nil,
 			parent:   nil,

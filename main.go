@@ -26,7 +26,7 @@ import (
 
 func main() {
 	tree := NewBTree(100)
-	db, err := InitDB(tree)
+	db, err := InitDB(tree, "db")
 
 	if err != nil {
 		log.Fatalf("could not init database cause: %v", err)

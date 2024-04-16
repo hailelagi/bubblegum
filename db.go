@@ -22,13 +22,14 @@ type Store interface {
 // "real" persistent B+ trees would use the open/read/write/seek syscalls more sophisticatedly.
 // see also alernatively: https://www.sqlite.org/mmap.html
 type DB struct {
-	datafile *os.File
-	store    Store
+	datafile     *os.File
+	store        Store
+	storeManager StoreManager
 }
 
-func InitDB(store Store) (*DB, error) {
+func InitDB(store Store, dbname string) (*DB, error) {
 	// init the datafile
-	init, err := os.Create("db")
+	init, err := os.Create(dbname)
 
 	if err != nil {
 		log.Fatal(err)
@@ -36,13 +37,19 @@ func InitDB(store Store) (*DB, error) {
 
 	defer init.Close()
 
-	// todo: preallocate header segment
-	file, err := syscall.Open("db", syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
+	file, err := syscall.Open(dbname, syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return &DB{datafile: os.NewFile(uintptr(file), "db"), store: store}, nil
+	datafile := os.NewFile(uintptr(file), "db")
+	manager := StoreManager{datafile: datafile}
+
+	if dbname != "test_db" {
+		manager.InitHeader()
+	}
+
+	return &DB{datafile: datafile, store: store, storeManager: manager}, nil
 }
 
 /*** Access Methods ***/

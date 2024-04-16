@@ -14,7 +14,7 @@ var testValueSize = cap(value)
 
 func TestInsertRoot(t *testing.T) {
 	tree := NewBTree(2)
-	db, _ := InitDB(tree)
+	db, _ := InitDB(tree, "test_db")
 
 	defer db.Close()
 
@@ -22,7 +22,7 @@ func TestInsertRoot(t *testing.T) {
 
 	errInsert := tree.Insert(key, value)
 	tree.Insert(key, value)
-	file, _ := os.OpenFile("db", os.O_RDONLY, 0644)
+	file, _ := os.OpenFile("test_db", os.O_RDONLY, 0644)
 	defer file.Close()
 
 	if errInsert != nil {

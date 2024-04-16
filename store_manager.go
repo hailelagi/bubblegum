@@ -1,8 +1,41 @@
 package main
 
+import (
+	"io"
+	"log"
+	"os"
+)
+
 // Storage manager - responsible for maintaining datafiles.
 // LIFO simple queue maybe
 // simple statstistics maybe
+
+type StoreManager struct {
+	datafile *os.File
+}
+
+func (s *StoreManager) InitHeader() {
+	// reserve first 100 bytes, later stuff meta info here
+	header := make([]byte, 100)
+	s.datafile.Seek(0, io.SeekStart)
+
+	_, err := s.datafile.Write(header)
+
+	if err != nil {
+		log.Fatalf("initial db setup failure %v", err)
+	}
+}
+
+func (*StoreManager) NewPage() (*Page, error) {
+	page := Page{}
+	err := page.Allocate()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &page, nil
+}
 
 // must implement mapper
 /*
