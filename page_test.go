@@ -25,7 +25,7 @@ func TestAllocandFlushRoot(t *testing.T) {
 		t.Error()
 	}
 
-	assert.Equal(t, 116, int(stat.Size()))
+	assert.Equal(t, 117, int(stat.Size()))
 
 	p, err := FetchPage(1, db.datafile)
 

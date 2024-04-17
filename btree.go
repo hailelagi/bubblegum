@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-type nodeType int
+type nodeType uint8
 
 // oh go, where art thy sum types? thine enums forsake me :(
 const (

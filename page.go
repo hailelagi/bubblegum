@@ -16,15 +16,19 @@ const (
 	OVERFLOW_PAGE_SIZE = 255
 )
 
-// 16 byte page header
+// 17 byte page header
 type pageHeader struct {
-	PageID     uint32 // 4 bytes
-	Reserve    uint32 // 4 bytes
-	FreeSlots  uint16 // 2 bytes
-	PLower     uint16 // 2 bytes
-	PHigh      uint16 // 2 bytes
-	NumSlots   byte   // 1 byte (uint8)
-	CellLayout byte   // 1 byte (uint8)
+	PageID  uint32 // 4 bytes
+	Reserve uint32 // 4 bytes
+
+	FreeSlots uint16 // 2 bytes
+	PLower    uint16 // 2 bytes
+	PHigh     uint16 // 2 bytes
+
+	NumSlots byte     // 1 byte (uint8)
+	PageType nodeType // node type (root, internal, leaf)
+	// all cells are of type CellLayout ie is key/pointer or key/value cell?
+	CellLayout byte // 1 byte (uint8)
 
 }
 
@@ -114,7 +118,9 @@ func (p *Page) Flush(datafile *os.File) error {
 	buf := new(bytes.Buffer)
 
 	// Seek to the position of the pageHeader within the file
-	_, err := datafile.Seek(int64(p.PLower), io.SeekStart)
+	ret, err := datafile.Seek(int64(p.PLower), io.SeekStart)
+	_assert(ret != -1, "seek to invalid region")
+
 	if err != nil {
 		log.Fatalf("error seeking: %v", err)
 	}
