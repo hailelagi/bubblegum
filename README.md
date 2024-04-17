@@ -9,29 +9,22 @@ Concurrency control is achieved using a single global blocking RWMutex lock(for 
 
 ## DataFile Format/Bit Representation
 
-Slotted Pages:
 ```
 | header |   Page(s)    | trailer |
 | ...    | .. | .. | .. |  ...    |
 ```
 
+Logically Pages/Slotted Pages:
 header:
 ```
-| header |
-| ...    |
+| header(fixed) |
+|     ...       |
 ```
 
 page:
 ```
 | page  |
-|header(field names) | cell |
-```
-
-
-trailer:
-```
-| trailer|
-| \n     |
+|header(field names)| (cell pointers) | (reserved) | cell| ... |
 ```
 
 ```bash
