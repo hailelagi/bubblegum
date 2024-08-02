@@ -9,7 +9,7 @@ An On-Disk B+ Tree storage engine built as a part of reading [Database Internals
 - SQL Parser
 - Catalog
 - Extensive Testing
-
+- Compile to WASM and render a shell in the browser!
 
 ## DataFile Format/Bit Representation
 
