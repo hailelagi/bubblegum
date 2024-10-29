@@ -7,28 +7,27 @@ import (
 	"testing"
 )
 
+type nodeData *[]int
+
 func TestBTreeSingleSplit(t *testing.T) {
 	tree := NewBTree(3)
 	elements := []int{5, 2, 1, 4}
 
 	for _, e := range elements {
-		tree.Upsert(e, e)
+		_ = tree.Upsert(e, e)
 	}
 
-	if slices.Compare(tree.root.keys, []int{2, 4}) != 0 {
-		t.Fail()
+	expectedTree := map[nodeData][]int{
+		&tree.root.keys:             {2, 4},
+		&tree.root.children[0].data: {1},
+		&tree.root.children[1].data: {2},
+		&tree.root.children[2].data: {4, 5},
 	}
 
-	if slices.Compare(tree.root.children[0].data, []int{1}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].data, []int{2}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[2].data, []int{4, 5}) != 0 {
-		t.Fail()
+	for contents, expected := range expectedTree {
+		if slices.Compare(*contents, expected) != 0 {
+			t.Fail()
+		}
 	}
 }
 
@@ -37,23 +36,20 @@ func TestBTreeSingleSplitDegreeFive(t *testing.T) {
 	elements := []int{5, 2, 1, 4, 8, 9, 7}
 
 	for _, e := range elements {
-		tree.Upsert(e, e)
+		_ = tree.Upsert(e, e)
 	}
 
-	if slices.Compare(tree.root.keys, []int{4, 7}) != 0 {
-		t.Fail()
+	expectedTree := map[nodeData][]int{
+		&tree.root.keys:             {4, 7},
+		&tree.root.children[0].data: {1, 2},
+		&tree.root.children[1].data: {4, 5},
+		&tree.root.children[2].data: {7, 8, 9},
 	}
 
-	if slices.Compare(tree.root.children[0].data, []int{1, 2}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].data, []int{4, 5}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[2].data, []int{7, 8, 9}) != 0 {
-		t.Fail()
+	for contents, expected := range expectedTree {
+		if slices.Compare(*contents, expected) != 0 {
+			t.Fail()
+		}
 	}
 }
 
@@ -62,37 +58,23 @@ func TestBTreeMultiSplit(t *testing.T) {
 	elements := []int{5, 2, 1, 4, 6, 7, 8, 3}
 
 	for _, e := range elements {
-		tree.Upsert(e, e)
+		_ = tree.Upsert(e, e)
+	}
+	expectedTree := map[nodeData][]int{
+		&tree.root.keys:                         {4, 6},
+		&tree.root.children[0].keys:             {2},
+		&tree.root.children[0].children[1].data: {2, 3},
+		&tree.root.children[1].keys:             {5},
+		&tree.root.children[1].children[1].data: {5},
+		&tree.root.children[2].keys:             {7},
+		&tree.root.children[2].children[1].data: {7, 8},
 	}
 
-	if slices.Compare(tree.root.keys, []int{4, 6}) != 0 {
-		t.Fail()
+	for contents, expected := range expectedTree {
+		if slices.Compare(*contents, expected) != 0 {
+			t.Fail()
+		}
 	}
-
-	if slices.Compare(tree.root.children[0].keys, []int{2}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[0].children[1].data, []int{2, 3}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].keys, []int{5}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].children[1].data, []int{5}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[2].keys, []int{7}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[2].children[1].data, []int{7, 8}) != 0 {
-		t.Fail()
-	}
-
 }
 
 func TestBTreeMultiDelete(t *testing.T) {
@@ -100,46 +82,31 @@ func TestBTreeMultiDelete(t *testing.T) {
 	elements := []int{5, 2, 1, 4, 6, 7, 8, 3}
 
 	for _, e := range elements {
-		tree.Upsert(e, e)
+		_ = tree.Upsert(e, e)
 	}
 
 	// deletion works slightly differently from how one
 	// would expect a b-tree to merge.
 	// it prefers the leftmost neighbour and doesn't steal.
+	_ = tree.Delete(5)
 
-	tree.Delete(5)
-
-	if slices.Compare(tree.root.keys, []int{4, 6}) != 0 {
-		t.Fail()
+	expectedTree := map[nodeData][]int{
+		&tree.root.keys:                         {4, 6},
+		&tree.root.children[0].keys:             {2},
+		&tree.root.children[0].children[0].data: {1},
+		&tree.root.children[0].children[1].data: {2, 3},
+		&tree.root.children[0].children[2].data: {4},
+		&tree.root.children[1].keys:             {7},
+		&tree.root.children[1].children[0].data: {6},
+		&tree.root.children[1].children[1].data: {7, 8},
 	}
 
-	if slices.Compare(tree.root.children[0].keys, []int{2}) != 0 {
-		t.Fail()
+	for contents, expected := range expectedTree {
+		if slices.Compare(*contents, expected) != 0 {
+			t.Fail()
+		}
 	}
 
-	if slices.Compare(tree.root.children[0].children[0].data, []int{1}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[0].children[1].data, []int{2, 3}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[0].children[2].data, []int{4}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].keys, []int{7}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].children[0].data, []int{6}) != 0 {
-		t.Fail()
-	}
-
-	if slices.Compare(tree.root.children[1].children[1].data, []int{7, 8}) != 0 {
-		t.Fail()
-	}
 }
 
 func BenchmarkBTree(b *testing.B) {

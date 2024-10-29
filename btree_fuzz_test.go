@@ -4,14 +4,10 @@ import (
 	"testing"
 )
 
-/*
-TODO: refactor these tests to run in parallel
-and structure inputs/asserts of t.Fail instead as table-driven tests
-*/
 func FuzzUpsertKeys(f *testing.F) {
 	tree := NewBTree(3)
 
-	for key := 1; key < 10_000; key++ {
+	for key := 1; key < 100_000; key++ {
 		f.Add(key)
 	}
 
@@ -28,13 +24,13 @@ func FuzzUpsertKeys(f *testing.F) {
 func FuzzGetKeys(f *testing.F) {
 	tree := NewBTree(3)
 
-	for key := 1; key < 10_000; key++ {
+	for key := 1; key < 100_000; key++ {
 		f.Add(key)
 	}
 
 	f.Fuzz(func(t *testing.T, key int) {
 		var found bool
-		tree.Upsert(key, key)
+		_ = tree.Upsert(key, key)
 
 		data, _, err := tree.Get(key)
 
@@ -57,7 +53,7 @@ func FuzzGetKeys(f *testing.F) {
 func FuzzDeleteKeys(f *testing.F) {
 	tree := NewBTree(3)
 
-	for key := 1; key < 10_000; key++ {
+	for key := 1; key < 100_000; key++ {
 		f.Add(key)
 	}
 
