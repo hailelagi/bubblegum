@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io"
@@ -146,4 +147,29 @@ func (p *Page) Flush(datafile *os.File) error {
 
 	log.Printf("written %v bytes to disk at pageID %v", n, p.PageID)
 	return nil
+}
+
+func syncToOffset(file *os.File, value []byte) (int64, error) {
+	writer := bufio.NewWriter(file)
+	// TODO: sync this to use the new page layout
+	// seek to correct block position using the pageID
+	// make sure we get to disk
+	_, err := writer.Write(value)
+	fErr := writer.Flush()
+
+	if err != nil {
+		return 0, err
+	}
+
+	if fErr != nil {
+		return 0, fErr
+	}
+
+	offset, err := file.Seek(0, io.SeekCurrent)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return offset, nil
 }

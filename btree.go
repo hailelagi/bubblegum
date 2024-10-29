@@ -1,46 +1,47 @@
 package main
 
 import (
-	"bufio"
-	"encoding/binary"
 	"errors"
-	"io"
-	"os"
-	"strconv"
+	"fmt"
+	"math"
+	"slices"
+	"sort"
 	"sync"
 )
 
 type nodeType uint8
 
-// oh go, where art thy sum types? thine enums forsake me :(
 const (
 	ROOT_NODE nodeType = iota + 1
 	INTERNAL_NODE
 	LEAF_NODE
 )
 
-// invariant three: relationship between keys and child pointers
-// every node (ie leaf or internal) except the root must have:
-// at least MIN_DEGREE children
-// todo: _assert this in split/merge
-var MIN_DEGREE_NODE int
-
 type BTree struct {
 	root      *node
+	nodeCount int
 	maxDegree int
 
 	db *DB
-	sync.RWMutex
+	mu sync.RWMutex
 }
 
 type node struct {
-	kind     nodeType
-	pageId   int64
+	kind   nodeType
+	parent *node // only accessible to leaf nodes
+	// Each entry in this table b-tree consists of a 64-bit signed integer
+	// key and up to 2147483647 bytes of arbitrary data.
+	// In RocksDB for e.g k/v are arbitrary byte sequences
 	keys     []int
+	children []*node
+	data     []int
+
+	// sibling pointers
 	next     *node
 	previous *node
-	parent   *node
-	children []*node
+
+	// dir index
+	pageId int64
 }
 
 // degree relates to number of children = maxKeys + 1
@@ -51,7 +52,7 @@ func NewBTree(maxDegree int) *BTree {
 	// invariant one
 	_assert(maxDegree >= 2, "the minimum maxDegree of a B+ tree must be greater than 2")
 
-	// root node is initially empty and triggers no page allocation.
+	// root node is initially empty and triggers initial/startup page allocations.
 	// assumes the db file is truncated and the init pageSize is at seek 0
 	return &BTree{
 		root: &node{
@@ -67,313 +68,433 @@ func NewBTree(maxDegree int) *BTree {
 	}
 }
 
-// Insert inserts a key/value pair into the B-tree
-func (t *BTree) Insert(key int, value []byte) error {
-	t.Lock()
-	defer t.Unlock()
-
-	_, err := findNode(t.root, key)
-
-	if err == nil {
-		return errors.New("attempted to insert duplicate key")
-	} else {
-		return t.root.insert(t, key, value, t.maxDegree)
-	}
-}
-
-// Scan traverses all the nodes in a B-tree in linear time.
-// it starts off at the left most pointer and recursively does
-// an inorder traversal to all leaf nodes.
-// may not implement
-func (t *BTree) Scan() ([][]byte, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (t *BTree) Range(start, end int) ([][]byte, error) {
-	return nil, nil
-}
-
 // Search starts from the root and traverses all internal nodes until it finds
-// the leaf node containing key, accesses its page and returns the byte arrary with the key/value.
-func (t *BTree) Get(key int) ([]byte, error) {
-	t.RLock()
-	defer t.RUnlock()
+// the leaf node containing the right page and ccesses it.
+func (t *BTree) Get(key int) ([]int, int, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
-	_, err := findNode(t.root, key)
+	if t.root == nil {
+		return nil, 0, errors.New("empty tree")
+	} else {
+		node, idx, _ := t.root.search(key)
 
-	if err != nil {
-		return nil, err
+		return node.data, idx, nil
+	}
+}
+
+func (t *BTree) Upsert(key int, value int) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.root == nil {
+		t.root = &node{kind: ROOT_NODE}
+		t.root.insert(t, key)
+
+		t.nodeCount++
+		return nil
+	} else {
+		// find leaf node to Upsert into or root at first
+		n, _, err := t.root.search(key)
+
+		if n == nil {
+			return fmt.Errorf("leaf node not found: %v", err)
+		}
+
+		t.nodeCount++
+		return n.insert(t, key)
+	}
+}
+
+func (n *node) search(key int) (*node, int, error) {
+	idx, found := slices.BinarySearch(n.keys, key)
+
+	if found {
+		if len(n.children) == 0 {
+			/*
+				// Binary search for the key
+					if node.kind == LEAF_NODE || node.kind == INTERNAL_NODE {
+						start, end := 0, len(node.keys)-1
+
+						for start <= end {
+							mid := start + (end-start)/2
+							if node.keys[mid] == key {
+								// Calculate the offset and seek to it
+								offset := int64(binary.LittleEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
+								if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
+									return nil, err
+								}
+
+								// TODO: factor out when using binary format
+								// read to delimiter
+								value, err := reader.ReadBytes('\n')
+								if err != nil {
+									return nil, err
+								}
+
+								return value, nil
+							} else if node.keys[mid] < key {
+								start = mid + 1
+							} else {
+								end = mid - 1
+							}
+						}
+						return nil, errors.New("key not found")
+					}
+
+			*/
+			return n, idx, nil
+		} else {
+			return n.children[idx].search(key)
+		}
 	}
 
-	// for testing todo: remove
-	// t.db.datafile.Seek(v.pageId, io.SeekStart)
-	result := make([]byte, 5)
-	t.db.datafile.Seek(5, io.SeekStart)
-	t.db.datafile.Read(result)
+	if len(n.children) == 0 {
+		return n, 0, errors.New("key not found, at leaf containing key")
+	}
 
-	return result, nil
+	if idx >= len(n.children) {
+		return n.children[idx-1].search(key)
+	}
 
+	return n.children[idx].search(key)
+}
+
+func (n *node) insert(t *BTree, key int) error {
+	if n.kind == ROOT_NODE && len(n.children) == 0 {
+		n.data = findInsertAt(n.data, key)
+		n.keys = findInsertAt(n.keys, key)
+	}
+
+	if n.kind == LEAF_NODE {
+		n.data = findInsertAt(n.data, key)
+	}
+
+	if len(n.data) < t.maxDegree {
+		return nil
+	} else {
+
+		n.split(t, len(n.data)/2)
+	}
+
+	return nil
+}
+
+func (n *node) split(t *BTree, midIdx int) error {
+	switch n.kind {
+	case LEAF_NODE:
+		splitPoint := n.data[midIdx]
+		left, right := n.data[:midIdx], n.data[midIdx:]
+		n.data = left
+
+		newNode := &node{kind: LEAF_NODE, parent: n.parent, data: right}
+
+		n.parent.children = append(n.parent.children, newNode)
+		n.parent.keys = findInsertAt(n.parent.keys, splitPoint)
+
+		// sibling pointers - only on leaf nodes
+		n.next = newNode
+		newNode.previous = n
+
+	case INTERNAL_NODE:
+		splitPoint := n.keys[midIdx]
+
+		// NB: note it's index/key + 1 for internal
+		left, right := n.keys[:midIdx], n.keys[midIdx+1:]
+		n.keys = left
+
+		newNode := &node{kind: INTERNAL_NODE, keys: right, parent: n.parent}
+		n.parent.children = append(n.parent.children, newNode)
+		n.parent.keys = findInsertAt(n.parent.keys, splitPoint)
+
+		// pointer relocation/bookkeeping
+		mid := len(n.children) / 2
+		leftPointers, rightPointers := n.children[:mid], n.children[mid:]
+
+		for _, child := range rightPointers {
+			child.parent = newNode
+		}
+
+		n.children, newNode.children = leftPointers, rightPointers
+
+	case ROOT_NODE:
+		if len(n.data) == 0 {
+			splitPoint := n.keys[midIdx]
+			left, right := n.keys[:midIdx], n.keys[midIdx+1:]
+
+			// demote current root
+			newRoot := &node{kind: ROOT_NODE, parent: nil}
+			newRoot.keys = findInsertAt(newRoot.keys, splitPoint)
+			t.root = newRoot
+
+			// pointer relocation/bookkeeping
+			mid := len(n.children) / 2
+			leftPointers, rightPointers := n.children[:mid], n.children[mid:]
+			sibling := &node{kind: INTERNAL_NODE, keys: left, children: leftPointers, parent: newRoot}
+			n.kind, n.keys, n.children, n.parent = INTERNAL_NODE, right, rightPointers, newRoot
+			newRoot.children = append(newRoot.children, sibling, n)
+
+			for _, child := range leftPointers {
+				child.parent = sibling
+			}
+
+		} else {
+			// demote current root to a leaf
+			n.keys = []int{}
+			n.kind = LEAF_NODE
+			newRoot := &node{kind: ROOT_NODE, parent: nil}
+			n.parent = newRoot
+			t.root = newRoot
+
+			newRoot.children = append(newRoot.children, n)
+
+			n.split(t, len(n.data)/2)
+		}
+
+	}
+
+	if len(n.parent.keys) > t.maxDegree-1 {
+		n.parent.split(t, len(n.parent.keys)/2)
+	}
+
+	return nil
 }
 
 func (t *BTree) Delete(key int) error {
-	t.Lock()
-	defer t.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	n, err := findNode(t.root, key)
-
-	if err == nil {
-		return n.delete(t, key, t.maxDegree)
+	if t.root == nil {
+		return errors.New("empty tree")
 	} else {
-		return err
+		// find leaf node to delete from or root
+		n, _, err := t.root.searchDel(key)
+
+		if err == nil {
+			t.nodeCount--
+			return n.delete(t, key)
+		}
+
+		return errors.New("key not in tree")
 	}
 }
 
-// TODO: for now the assumption is the key == offset, this is not true.
-// findNode searches from the root and traverses all internal nodes until it finds
-// the leaf node containing key or in the case of a single node root, the root.
-func findNode(root *node, key int) (*node, error) {
-	currNode := root
+// TODO(refactor): collapse this function into one
+func (n *node) searchDel(key int) (*node, int, error) {
+	idx, found := slices.BinarySearch(n.keys, key)
 
-	if len(currNode.keys) == 0 {
-		return nil, errors.New("key not found")
-	}
-
-	if len(currNode.keys) == 1 {
-		if currNode.keys[0] == key {
-			return currNode, nil
+	if found {
+		if n.kind == LEAF_NODE {
+			return n, idx, nil
 		} else {
-			return nil, errors.New("key not found")
-		}
-	}
-
-	start, end := 0, len(currNode.keys)-1
-
-	for start <= end {
-		mid := start + (end-start)/2
-
-		if currNode.keys[mid] == key {
-			return currNode, nil
-		} else if currNode.keys[mid] > key {
-			end = mid - 1
-		} else {
-			start = mid + 1
-		}
-	}
-
-	search := start + (end-start)/2
-
-	if len(currNode.children) == 0 || currNode.kind == LEAF_NODE {
-		return nil, errors.New("key not found")
-	} else {
-		// validate relationship btwn num keys and searchIndex
-		// but should work
-		return findNode(currNode.children[search], key)
-	}
-}
-
-// invariant two: relationship between keys and child pointers
-// Each node holds up to N keys and N + 1 pointers to the child nodes
-func (n *node) insert(t *BTree, key int, value []byte, degree int) error {
-	switch n.kind {
-	case ROOT_NODE:
-		if len(n.keys) > degree-1 {
-			n.splitChild(t, len(n.keys)/2, t.maxDegree)
-		} else {
-			offset, err := syncToOffset(t.db.datafile, value)
-			if err != nil {
-				return err
+			if len(n.children) == 0 {
+				return n, 0, nil
 			}
-			n.pageId = offset
 
-			// TODO: this key thing
-			// do you map offsets to the id directly?
-			n.keys = append(n.keys, int(offset))
-		}
-	case LEAF_NODE:
-		i := 0
-		for i < len(n.keys) && key > n.keys[i] {
-			i++
-		}
-
-		offset, err := syncToOffset(t.db.datafile, value)
-
-		if err != nil {
-			return err
-		}
-
-		n.keys = append(n.keys, int(offset))
-
-		copy(n.keys[i+1:], n.keys[i:])
-		n.keys[i] = key
-	case INTERNAL_NODE:
-		i := 0
-		for i < len(n.keys) && key > n.keys[i] {
-			i++
-		}
-		n.children[i].insert(t, key, value, t.maxDegree)
-	}
-
-	return nil
-}
-
-func (node *node) search(t *BTree, key int) ([]byte, error) {
-	reader := bufio.NewReader(t.db.datafile)
-
-	if node.kind == ROOT_NODE {
-		for _, k := range node.keys {
-			if k == key {
-				offset := int64(binary.LittleEndian.Uint64([]byte(strconv.Itoa(k))))
-				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
-					return nil, err
-				}
-
-				value, err := reader.ReadBytes('\n')
-
-				if err != nil {
-					return value, nil
-				}
+			if idx+1 > len(n.children) {
+				return n.children[idx].searchDel(key)
 			}
+
+			return n.children[idx+1].searchDel(key)
 		}
 	}
 
-	// Binary search for the key
-	if node.kind == LEAF_NODE || node.kind == INTERNAL_NODE {
-		start, end := 0, len(node.keys)-1
-
-		for start <= end {
-			mid := start + (end-start)/2
-			if node.keys[mid] == key {
-				// Calculate the offset and seek to it
-				offset := int64(binary.LittleEndian.Uint64([]byte(strconv.Itoa(node.keys[mid]))))
-				if _, err := t.db.datafile.Seek(offset, io.SeekStart); err != nil {
-					return nil, err
-				}
-
-				// TODO: factor out when using binary format
-				// read to delimiter
-				value, err := reader.ReadBytes('\n')
-				if err != nil {
-					return nil, err
-				}
-
-				return value, nil
-			} else if node.keys[mid] < key {
-				start = mid + 1
-			} else {
-				end = mid - 1
-			}
-		}
-		return nil, errors.New("key not found")
+	if len(n.children) == 0 {
+		return n, 0, nil
 	}
 
-	// If the node is not a leaf node, recursively search in the appropriate child
-	i := 0
-	for i < len(node.keys) && key >= node.keys[i] {
-		i++
-	}
-
-	return node.children[i].search(t, key) // Recursively search in child node
+	return n.children[idx].searchDel(key)
 }
 
-func (node *node) delete(t *BTree, key int, maxDegree int) error {
-	// find node using key
-	// pass in node, to node stealSibling
-	// assume node is root at first
-	// this an optimisation maybe do later
-	ok, err := node.stealSibling(t, maxDegree)
-
-	if err != nil {
-		return err
-	}
-
-	if !ok {
-		err := node.mergeChildren(t, maxDegree)
-
-		if err != nil {
-			return err
+// Deletion is the most complicated operation for a B-Tree.
+// this covers part one, "merging"
+// see: https://opendatastructures.org/ods-python/14_2_B_Trees.html#SECTION001723000000000000000
+func (n *node) delete(t *BTree, key int) error {
+	for i, v := range n.data {
+		if v == key {
+			n.data = cut(i, n.data)
 		}
 	}
 
-	return nil
-}
-
-func (node *node) stealSibling(t *BTree, maxDegree int) (bool, error) {
-	return false, nil
-}
-
-func (node *node) mergeChildren(t *BTree, maxDegree int) error {
-	return nil
-}
-
-// splitChild splits the child n of the current n at the specified index.
-func (n *node) splitChild(t *BTree, index, maxDegree int) {
-	// Create a new n to hold the keys and children that will be moved
-	newNode := &node{
-		keys:     make([]int, 0),
-		children: make([]*node, 0),
-		kind:     LEAF_NODE,
-		next:     n.next,
-	}
-
-	// TODO: this is.. not correct.
-	// Move keys and children to the new n
-	copy(newNode.keys, n.keys[index:])
-	copy(newNode.children, n.children[index:])
-	n.keys = n.keys[:index]
-	n.children = n.children[:index]
-
-	// TODO(FIXME): next is not set correctly
-	if n.kind == LEAF_NODE {
-		n.next = newNode
-	}
-
-	// If the current n is the root, create a new root and add the median key
 	if n.kind == ROOT_NODE {
-		newRoot := &node{
-			keys:     []int{newNode.keys[0]},
-			children: []*node{n, newNode},
-			kind:     ROOT_NODE,
+		return nil
+	}
+
+	// is the leaf empty or underflown?
+	if n.kind == LEAF_NODE && len(n.data) < (t.maxDegree/2) {
+		if sibling, _, err := n.preMerge(t.maxDegree); err == nil {
+			return n.mergeSibling(t, sibling, key)
+		} else {
+			return errors.New("see rebalancing.go")
 		}
-		t.root = newRoot
-		return
+	} else {
+		// should we update the parent's separator?
+		if n.parent.keys[0] < n.data[0] {
+			// delete the key from the parent
+			for i, k := range n.parent.keys {
+				if k == key {
+					n.parent.keys = cut(i, n.parent.keys)
+					newSeperator := len(n.data) / 2
+					n.parent.keys = append(n.parent.keys, n.data[newSeperator])
+				}
+			}
+		}
 	}
 
-	// Otherwise, insert the median key into the parent n
-	parent := n.parent
-	parent.keys = append(parent.keys, 0)
-	parent.children = append(parent.children, nil)
-	copy(parent.keys[index+1:], parent.keys[index:])
-	copy(parent.children[index+1:], parent.children[index:])
-	parent.keys[index] = newNode.keys[0]
-	parent.children[index] = newNode
-
-	// Check if the parent n needs splitting
-	if len(parent.keys) > maxDegree {
-		parent.splitChild(t, len(parent.keys)/2, maxDegree)
+	// underflow triggers a merge cascade recurse to parent
+	// recurse UPWARD and check invariants
+	if len(n.parent.keys) < ((t.maxDegree - 1) / 2) {
+		if sibling, _, err := n.parent.preMerge(t.maxDegree); err == nil {
+			return n.parent.mergeSibling(t, sibling, key)
+		} else {
+			return errors.New("see rebalancing.go")
+		}
 	}
+	return nil
 }
 
-func syncToOffset(file *os.File, value []byte) (int64, error) {
-	writer := bufio.NewWriter(file)
-	// TODO: sync this to use the new page layout
-	// seek to correct block position using the pageID
-	// make sure we get to disk
-	_, err := writer.Write(value)
-	fErr := writer.Flush()
+// preMerge if two adjacent leaf nodes have a common parent and their contents fit into a single node
+func (n *node) preMerge(size int) (*node, int, error) {
+	switch n.kind {
+	case INTERNAL_NODE:
+		// no sibling pointers so we have to go up to parent
+		// we check all our siblings if we can re-distribute
 
-	if err != nil {
-		return 0, err
+		for i, sibling := range n.parent.children {
+			if n == sibling {
+				// cannot merge with self
+				continue
+			} else {
+				// can merge with sibling?
+				if len(sibling.keys)+len(n.keys) < size {
+					return sibling, i, nil
+
+				}
+			}
+		}
+
+	case LEAF_NODE:
+		if n.previous != nil {
+			if len(n.previous.data)+len(n.data) < size {
+				n.previous.next = n.next
+				return n.previous, 0, nil
+			}
+		}
+
+		if n.next != nil {
+			if len(n.next.data)+len(n.data) < size {
+				n.next.previous = n.previous
+				return n.next, 0, nil
+			}
+		}
+
+	case ROOT_NODE:
+		// if underfull merge with first left child
+		if len(n.keys)+len(n.children[0].keys) <= size {
+			return n.children[0], 0, nil
+		}
 	}
 
-	if fErr != nil {
-		return 0, fErr
+	return nil, 0, errors.New("cannot merge with sibling")
+}
+
+// merging can be... very interesting.
+// you can slap on an iter api like(rust):
+// https://github.com/rust-lang/rust/blob/1c19595575968ea77c7f85e97c67d44d8c0f9a68/library/alloc/src/collections/btree/merge_iter.rs#L41
+
+// go/pebble
+// iterator/cursor: https://github.com/cockroachdb/pebble/blob/c4daad9128e053e496fa7916fda8b6df57256823/internal/manifest/btree.go#L973 &&
+// https://github.com/cockroachdb/pebble/blob/c4daad9128e053e496fa7916fda8b6df57256823/internal/manifest/btree.go#L891
+
+// the actual merge operation
+// https://github.com/cockroachdb/pebble/blob/c4daad9128e053e496fa7916fda8b6df57256823/internal/manifest/btree.go#L620
+func (n *node) mergeSibling(t *BTree, sibling *node, key int) error {
+	switch n.kind {
+	case LEAF_NODE:
+		_assert(n.parent == sibling.parent, "non-common ancestor")
+		sibling.data = append(sibling.data, n.data...)
+
+		// deallocate/collapse underflow node
+		for i, node := range sibling.parent.children {
+			if node == n {
+				n.parent.children = append(n.parent.children[:i], n.parent.children[i+1:]...)
+			}
+		}
+
+		for i, k := range sibling.parent.keys {
+			if k == key {
+				sibling.parent.keys = cut(i, sibling.parent.keys)
+
+				if len(n.parent.keys) < int(math.Ceil(float64(t.maxDegree)/2)) {
+					if sibling, _, err := sibling.parent.preMerge(t.maxDegree); err == nil {
+						return n.parent.mergeSibling(t, sibling, key)
+					} else {
+						return errors.New("see rebalancing.go")
+					}
+				}
+			}
+		}
+
+	case INTERNAL_NODE:
+		_assert(n.parent == sibling.parent, "non-common ancestor")
+		sibling.keys = append(sibling.keys, n.keys...)
+		sibling.children = append(sibling.children, n.children...)
+
+		// mark n for deallocation
+		for i, child := range n.parent.children {
+			if child == n {
+				n.parent.children = append(n.parent.children[:i], n.parent.children[i+1:]...)
+				break
+			}
+		}
+
+		// recursive case
+		if len(n.parent.children) < int(math.Ceil(float64(t.maxDegree)/2)) {
+			if sibling, _, err := n.parent.preMerge(t.maxDegree); err == nil {
+				return n.parent.mergeSibling(t, sibling, key)
+			} else {
+				return errors.New("see rebalancing.go")
+			}
+		}
+	case ROOT_NODE:
+		sibling.keys = append(sibling.keys, n.keys...)
+		sibling.kind = ROOT_NODE
+		t.root = sibling
 	}
 
-	offset, err := file.Seek(0, io.SeekCurrent)
+	return nil
+}
 
-	if err != nil {
-		return 0, err
+// finds the offset in the page and writes to it
+func findInsertAt(elems []int, elem int) []int {
+	if len(elems) == 0 {
+		return append(elems, elem)
 	}
 
-	return offset, nil
+	idx := sort.Search(len(elems), func(i int) bool {
+		return elems[i] >= elem
+	})
+
+	/*
+		// for testing todo: remove
+		// t.db.datafile.Seek(v.pageId, io.SeekStart)
+		result := make([]byte, 5)
+		t.db.datafile.Seek(5, io.SeekStart)
+		t.db.datafile.Read(result)
+
+	*/
+
+	elems = append(elems, 0)
+	copy(elems[idx+1:], elems[idx:])
+	elems[idx] = elem
+
+	return elems
+}
+
+func cut(idx int, elems []int) []int {
+	if len(elems) == 1 {
+		return nil
+	} else {
+		return append(elems[:idx], elems[idx+1:]...)
+	}
 }

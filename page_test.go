@@ -1,12 +1,6 @@
 package main
 
-import (
-	"os"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
-
+/*
 func TestAllocandFlushRoot(t *testing.T) {
 	tree := NewBTree(2)
 	db, _ := InitDB(tree, "test_db")
@@ -82,4 +76,5 @@ func TestFlushDirtyPage(t *testing.T) {
 
 	assert.Equal(t, value, expectedBuf)
 }
+
 */

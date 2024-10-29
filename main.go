@@ -19,39 +19,39 @@ pseudocode: http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
 */
 
 import (
-	"bytes"
 	"fmt"
-	"log"
 )
 
 func main() {
-	tree := NewBTree(100)
-	db, err := InitDB(tree, "db")
+	// := NewBTree(100)
+	/*
+		db, err := InitDB(tree, "db")
 
-	if err != nil {
-		log.Fatalf("could not init database cause: %v", err)
-	}
+		if err != nil {
+			log.Fatalf("could not init database cause: %v", err)
+		}
 
-	defer db.Close()
+		defer db.Close()
 
-	for i := 1; i < 10_000; i++ {
-		key := i
-		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		_ = db.Insert(key, value)
-	}
+		for i := 1; i < 10_000; i++ {
+			key := i
+			value := []byte(fmt.Sprint("msg_", i, "\n"))
+			_ = db.Insert(key, value)
+		}
 
-	for i := 1; i < 10_000; i++ {
-		res, _ := db.Get(i)
-		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		_assert(bytes.Equal(res, value), "read your writes :) ")
-	}
+		for i := 1; i < 10_000; i++ {
+			res, _ := db.Get(i)
+			value := []byte(fmt.Sprint("msg_", i, "\n"))
+			_assert(bytes.Equal(res, value), "read your writes :) ")
+		}
 
-	for i := 1; i < 10_000; i++ {
-		_ = db.Delete(i)
-		err := db.Delete(i)
+		for i := 1; i < 10_000; i++ {
+			_ = db.Delete(i)
+			err := db.Delete(i)
 
-		_assert(err != nil, "value must not be found after deletion")
-	}
+			_assert(err != nil, "value must not be found after deletion")
+		}
+	*/
 
 }
 

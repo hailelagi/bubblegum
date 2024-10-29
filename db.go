@@ -68,12 +68,6 @@ func (db *DB) Get(key int) ([]byte, error) {
 	return nil, nil
 }
 
-func (db *DB) Delete(key int) error {
-	// todo stub out key for Interface{} or parameterise this
-	// todo handle high level datatypes, int & str
-	return db.store.Delete(key)
-}
-
 func (db *DB) Close() {
 	db.datafile.Close()
 }

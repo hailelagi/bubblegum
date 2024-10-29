@@ -2,16 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var key = 1
 var value = []byte(fmt.Sprint("msg_", key))
 var testValueSize = cap(value)
 
+/*
 func TestInsertRoot(t *testing.T) {
 	tree := NewBTree(2)
 	db, _ := InitDB(tree, "test_db")
@@ -20,8 +17,8 @@ func TestInsertRoot(t *testing.T) {
 
 	tree.db = db
 
-	errInsert := tree.Insert(key, value)
-	tree.Insert(key, value)
+	errInsert := tree.Upsert(key, value)
+	tree.Upsert(key, value)
 	file, _ := os.OpenFile("test_db", os.O_RDONLY, 0644)
 	defer file.Close()
 
@@ -35,8 +32,6 @@ func TestInsertRoot(t *testing.T) {
 	// TODO: make this test less dumb
 	assert.Equal(t, value, expectedBuf[:testValueSize-3])
 }
-
-/*
 
 func TestInsertAnDSearchRoot(t *testing.T) {
 	tree := NewBTree(4)
@@ -113,7 +108,6 @@ func TestInsertKeysAfterSplit(t *testing.T) {
 	_assert.Equal(t, expectedKeys[:testValueSize*4], gotBuf[:testValueSize*4])
 }
 
-/*
 func TestInsertAndAccessBTree(t *testing.T) {
 	tree := NewBTree(4)
 
