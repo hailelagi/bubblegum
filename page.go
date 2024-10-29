@@ -59,6 +59,10 @@ type cell struct {
 	data      []byte
 }
 
+func NewPage(datafile *os.File) (*Page, error) {
+	return nil, nil
+}
+
 /*
 Database files often consist of multiple parts, with a lookup table aiding navigation
 and pointing to the start offsets of these parts written either in the file header,

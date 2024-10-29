@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,7 @@ import (
 
 func TestAllocandFlushRoot(t *testing.T) {
 	tree := NewBTree(2)
-	db, _ := InitDB(tree, "db")
+	db, _ := InitDB(tree, "test_db")
 	defer db.Close()
 
 	page, err := db.storeManager.NewPage()
@@ -37,10 +38,9 @@ func TestAllocandFlushRoot(t *testing.T) {
 	assert.Equal(t, 64, int(p.NumSlots))
 }
 
-/*
 func TestFlushCleanPage(t *testing.T) {
 	tree := NewBTree(2)
-	db, _ := InitDB(tree)
+	db, _ := InitDB(tree, "db")
 	defer db.Close()
 
 	page, err := NewPage(db.datafile)
@@ -55,11 +55,10 @@ func TestFlushCleanPage(t *testing.T) {
 	defer file.Close()
 
 	expectedBuf := make([]byte, 100)
-	file.Read(expectedBuf)
+	_, _ = file.Read(expectedBuf)
 
 	assert.Equal(t, value, expectedBuf)
 }
-*/
 
 /*
 func TestFlushDirtyPage(t *testing.T) {
@@ -81,7 +80,6 @@ func TestFlushDirtyPage(t *testing.T) {
 	expectedBuf := make([]byte, testValueSize)
 	file.Read(expectedBuf)
 
-	_assert.Equal(t, value, expectedBuf)
+	assert.Equal(t, value, expectedBuf)
 }
-
 */
