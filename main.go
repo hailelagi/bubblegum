@@ -32,10 +32,12 @@ func main() {
 		log.Fatalf("could not init database cause: %v", err)
 	}
 
+	defer db.Close()
+
 	for i := 1; i < 10_000; i++ {
 		key := i
 		value := []byte(fmt.Sprint("msg_", i, "\n"))
-		db.Insert(key, value)
+		_ = db.Insert(key, value)
 	}
 
 	for i := 1; i < 10_000; i++ {
@@ -45,14 +47,12 @@ func main() {
 	}
 
 	for i := 1; i < 10_000; i++ {
-		db.Delete(i)
+		_ = db.Delete(i)
 		err := db.Delete(i)
 
 		_assert(err != nil, "value must not be found after deletion")
 	}
 
-	// cleanup
-	db.Close()
 }
 
 // why? see: https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety
