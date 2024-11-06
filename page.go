@@ -71,6 +71,7 @@ trailer, or in the separate file.
 
 DBMS uses an indirection layer to map pageIDs to offsets.
 page directory? - maps page ids to offsets
+https://www.postgresql.org/docs/current/storage-fsm.html
 */
 func (p *Page) MapToOffset() (int64, error) {
 	return 0, nil
