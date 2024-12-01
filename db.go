@@ -37,7 +37,7 @@ func InitDB(store Store, dbname string) (*DB, error) {
 
 	defer init.Close()
 
-	file, err := syscall.Open(dbname, syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
+	file, err := syscall.Open(dbname, syscall.O_CREAT|syscall.O_RDWR|syscall.O_DSYNC|syscall.O_TRUNC, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
